@@ -1,7 +1,35 @@
 #include "main.h"
 #include "okapi/api.hpp"
+#include "base_functions.h"
 using namespace okapi;
+using namespace base_functions;
 
+
+// Ports Wheels
+#define FL_WHEEL 1
+#define FR_WHEEL 2
+#define BL_WHEEL 3
+#define BR_WHEEL 4
+// Ports Arm
+#define R_ARM 10
+#define L_ARM 9
+// Port Doghnut intake
+#define INTAKE 8
+// Port Base Elevator
+#define ELEVATOR 11
+// Port Sensor
+#define GYRO 20
+// Port Antena
+#define ANTENA 21
+// Port Pneumatics
+#define PNEUMATICS 'A'
+// Proportions
+#define WHEEL_DIAMETER 11_cm
+#define WHEEL_TRACK 43_cm
+// Gear set
+#define GEARSET_ARM AbstractMotor::gearset::red
+#define GEARSET_WHEELS AbstractMotor::gearset::green
+#define GEARSET_INTAKE AbstractMotor::gearset::green
 
 
 /**
@@ -10,9 +38,11 @@ using namespace okapi;
  * All other competition modes are blocked by initialize; it is recommended
  * to keep execution time for this mode under a few seconds.
  */
+ #define PNEU 'A'
 void initialize() {
 	pros::lcd::initialize();
-	pros::lcd::set_text(1, "Test base roulante 4 moteurs");
+	pros::lcd::set_text(1, "Test Robot");
+	//pros::ADIDigitalOut piston (PNEU);
 }
 
 /**
@@ -61,44 +91,32 @@ void autonomous() {}
  */
 
 // A modifier en fonction des ports utilises pour les moteurs du test
- #define LB 1
- #define LF 12
- #define RB 10
- #define RF 11
- #define ARM 8
- #define CLAW 3
- #define WHEEL_DIAMETER 10_cm
- #define WHEEL_TRACK 31_cm
+
 
 void opcontrol() {
-	//create motor group for left and right
-	// One of the motors on the motorgroup has to be reversed because of design
-	Motor motorLB = Motor(LB,false,AbstractMotor::gearset::green,AbstractMotor::encoderUnits::rotations);
-	Motor motorLF = Motor(LF,false,AbstractMotor::gearset::green,AbstractMotor::encoderUnits::rotations);
 
-	Motor motorRB = Motor(RB,true,AbstractMotor::gearset::green,AbstractMotor::encoderUnits::rotations);
-	Motor motorRF = Motor(RF,true,AbstractMotor::gearset::green,AbstractMotor::encoderUnits::rotations);
-
-	Motor motorArm = Motor(ARM,false,AbstractMotor::gearset::green,AbstractMotor::encoderUnits::rotations);
-	Motor motorClaw = Motor(CLAW,true,AbstractMotor::gearset::green,AbstractMotor::encoderUnits::rotations);
-
-	const std::initializer_list<Motor> left = {motorLB, motorLF};
-	const std::initializer_list<Motor> right = {motorRB, motorRF};
-
-	std::shared_ptr<MotorGroup> grpLeft(new MotorGroup(left));
-	std::shared_ptr<MotorGroup> grpRight(new MotorGroup(right));
-
-	//Create Chassis with those two motorgroups
-	std::shared_ptr<ChassisController> drive =
-		ChassisControllerBuilder()
-			.withMotors(grpLeft,grpRight)
-			.withDimensions(AbstractMotor::gearset::green,{{WHEEL_DIAMETER,WHEEL_TRACK},imev5GreenTPR})
-			.build();
+	std::shared_ptr<ChassisController> drive = base_functions::initMobileBase(FL_WHEEL,
+																			FR_WHEEL,
+																			BL_WHEEL,
+																			BR_WHEEL,
+																			WHEEL_DIAMETER,
+																			WHEEL_TRACK);
 
 	// Create controller object
 	Controller controller;
-	 float speedLeftX,speedLeftY,speedRightX,speedRightY;
-	 bool test = false;
+	float speedLeftX,speedLeftY,speedRightX,speedRightY;
+
+	while(true){
+		speedLeftY = controller.getAnalog(ControllerAnalog::leftY);
+		speedLeftX = controller.getAnalog(ControllerAnalog::leftX);
+		speedRightY = controller.getAnalog(ControllerAnalog::rightY);
+		speedRightX = controller.getAnalog(ControllerAnalog::rightX);
+		// My control mode with the two different joysticks
+
+		drive->getModel()->arcade(speedLeftY, speedLeftX);
+	}
+
+	/*
 	while(true){
 
 		speedLeftY = controller.getAnalog(ControllerAnalog::leftY);
@@ -127,5 +145,14 @@ void opcontrol() {
 
 		// motorArm.tarePosition();
 		// motorArm.moveAbsolute(0, 200);
+	}*/
+	/*
+	while(true){
+		pros::ADIDigitalOut piston (PNEU);
+		piston.set_value(true);
+		pros::delay(1000);
+		piston.set_value(false);
 	}
+	*/
+
 }
