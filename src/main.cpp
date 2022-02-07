@@ -26,10 +26,6 @@ using namespace base_functions;
 // Proportions
 #define WHEEL_DIAMETER 11_cm
 #define WHEEL_TRACK 43_cm
-// Gear set
-#define GEARSET_ARM AbstractMotor::gearset::red
-#define GEARSET_WHEELS AbstractMotor::gearset::green
-#define GEARSET_INTAKE AbstractMotor::gearset::green
 
 
 /**
@@ -106,13 +102,28 @@ void opcontrol() {
 	Controller controller;
 	float speedLeftX,speedLeftY,speedRightX,speedRightY;
 
+	Motor motorArmLeft = Motor(L_ARM,true,AbstractMotor::gearset::red,AbstractMotor::encoderUnits::rotations);
+	Motor motorArmRight = Motor(R_ARM,false,AbstractMotor::gearset::red,AbstractMotor::encoderUnits::rotations);
+
+
+
 	while(true){
 		speedLeftY = controller.getAnalog(ControllerAnalog::leftY);
 		speedLeftX = controller.getAnalog(ControllerAnalog::leftX);
 		speedRightY = controller.getAnalog(ControllerAnalog::rightY);
 		speedRightX = controller.getAnalog(ControllerAnalog::rightX);
 		// My control mode with the two different joysticks
-
+		if(controller.getDigital(ControllerDigital::R1)){
+			motorArmRight.moveRelative(1.0,100);
+			motorArmLeft.moveRelative(1.0,100);
+		}else if(controller.getDigital(ControllerDigital::R2)){
+			motorArmRight.moveRelative(-1.0,100);
+			motorArmLeft.moveRelative(-1.0,100);
+		}/*else{
+			motorArmLeft.moveRelative(0,100);
+			motorArmRight.moveRelative(0,100);
+		}*/
+		//TODO Set limit for arm
 		drive->getModel()->arcade(speedLeftY, speedLeftX);
 	}
 
