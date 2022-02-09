@@ -97,11 +97,13 @@ void autonomous() {}
  * task, not resume it from where it left off.
  */
 
-//TODO Change separate file functions for movement
+// TODO Change separate file functions for movement
 
 void opcontrol()
 {
-	//TODO Add pneumatics
+
+	pros::ADIPort pneumatic(PORT_PNEUMATICS, ADI_DIGITAL_OUT);
+
 	Motor motorFL = Motor(PORT_FL_WHEEL, DIRECTION_FL_WHEEL, GEARSET_WHEELS, ENCODER_UNIT_WHEELS);
 	Motor motorFR = Motor(PORT_FR_WHEEL, DIRECTION_FR_WHEEL, GEARSET_WHEELS, ENCODER_UNIT_WHEELS);
 	Motor motorBL = Motor(PORT_BL_WHEEL, DIRECTION_BL_WHEEL, GEARSET_WHEELS, ENCODER_UNIT_WHEELS);
@@ -121,6 +123,8 @@ void opcontrol()
 	bool r2_pressed;
 	bool x_pressed;
 	bool x_already_pressed;
+	bool y_pressed;
+	bool y_already_pressed;
 
 	IMU gyroscope(PORT_GYROSCOPE);
 	RotationSensor armRotation(PORT_ARM_ROTATION);
@@ -142,7 +146,9 @@ void opcontrol()
 		r1_pressed = controller.getDigital(ControllerDigital::R1);
 		r2_pressed = controller.getDigital(ControllerDigital::R2);
 		x_pressed = controller.getDigital(ControllerDigital::X);
+		y_pressed = controller.getDigital(ControllerDigital::Y);
 
+		// Ring mill
 		if (x_pressed)
 		{
 			if (x_already_pressed)
@@ -154,6 +160,21 @@ void opcontrol()
 			{
 				ringMillMotor.moveVelocity(200);
 				x_already_pressed = true;
+			}
+		}
+
+		// Pneumatic
+		if (y_pressed)
+		{
+			if (y_already_pressed)
+			{
+				pneumatic.set_value(LOW);
+				y_already_pressed = false;
+			}
+			else
+			{
+				pneumatic.set_value(HIGH);
+				y_already_pressed = true;
 			}
 		}
 
