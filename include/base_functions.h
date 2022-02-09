@@ -4,10 +4,9 @@ using namespace okapi;
 using namespace std;
 
 namespace base_functions{
-        std::shared_ptr<ChassisController> initMobileBase(u_int8_t frontLeft,
-                                                    u_int8_t frontRight,
-                                                    u_int8_t backLeft,
-                                                    u_int8_t backRight,
-                                                    QLength wheelDiameter,
-                                                    QLength wheelTrack);
+        extern bool ring_mill_already_pressed;
+        extern bool pneumatic_already_pressed;
+
+        void activate_ring_mill(std::shared_ptr<Motor> ringMillMotor,bool button_pressed);
+        void activate_penumatic(std::shared_ptr<pros::ADIPort> pneumaticPort,bool button_pressed);
 }

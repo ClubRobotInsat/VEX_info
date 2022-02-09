@@ -102,8 +102,6 @@ void autonomous() {}
 void opcontrol()
 {
 
-	pros::ADIPort pneumatic(PORT_PNEUMATICS, ADI_DIGITAL_OUT);
-
 	Motor motorFL = Motor(PORT_FL_WHEEL, DIRECTION_FL_WHEEL, GEARSET_WHEELS, ENCODER_UNIT_WHEELS);
 	Motor motorFR = Motor(PORT_FR_WHEEL, DIRECTION_FR_WHEEL, GEARSET_WHEELS, ENCODER_UNIT_WHEELS);
 	Motor motorBL = Motor(PORT_BL_WHEEL, DIRECTION_BL_WHEEL, GEARSET_WHEELS, ENCODER_UNIT_WHEELS);
@@ -115,7 +113,9 @@ void opcontrol()
 	std::shared_ptr<ChassisController> drive =
 		ChassisControllerBuilder().withMotors(leftMotors, rightMotors).withDimensions(GEARSET_WHEELS, {{WHEEL_DIAMETER, WHEEL_TRACK}, imev5GreenTPR}).build();
 
-	Motor ringMillMotor(PORT_RING_MILL, DIRECTION_RING_MILL, GEARSET_RING_MILL, ENCODER_UNIT_RING_MILL);
+	// TODO check if this is okayish way to use shared pointers
+	std::shared_ptr<Motor> ringMillMotor(new Motor(PORT_RING_MILL, DIRECTION_RING_MILL, GEARSET_RING_MILL, ENCODER_UNIT_RING_MILL));
+	std::shared_ptr<pros::ADIPort> pneumatic(new pros::ADIPort(PORT_PNEUMATICS, ADI_DIGITAL_OUT));
 
 	Controller controller;
 	float speedLeftX, speedLeftY, speedRightX, speedRightY;
@@ -149,34 +149,10 @@ void opcontrol()
 		y_pressed = controller.getDigital(ControllerDigital::Y);
 
 		// Ring mill
-		if (x_pressed)
-		{
-			if (x_already_pressed)
-			{
-				ringMillMotor.moveVelocity(0);
-				x_already_pressed = false;
-			}
-			else
-			{
-				ringMillMotor.moveVelocity(200);
-				x_already_pressed = true;
-			}
-		}
+		base_functions::activate_ring_mill(ringMillMotor, x_pressed);
 
 		// Pneumatic
-		if (y_pressed)
-		{
-			if (y_already_pressed)
-			{
-				pneumatic.set_value(LOW);
-				y_already_pressed = false;
-			}
-			else
-			{
-				pneumatic.set_value(HIGH);
-				y_already_pressed = true;
-			}
-		}
+		base_functions::activate_penumatic(pneumatic, y_pressed);
 
 		if (r1_pressed)
 		{
