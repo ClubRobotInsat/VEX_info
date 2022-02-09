@@ -1,8 +1,31 @@
 #include "main.h"
 #include "okapi/api.hpp"
+#include "base_functions.h"
 using namespace okapi;
+using namespace base_functions;
 
+// Sensors and Actuators ports
+#define PORT_FL_WHEEL 1
+#define PORT_FR_WHEEL 2
+#define PORT_BL_WHEEL 3
+#define PORT_BR_WHEEL 4
+#define PORT_R_ARM 10
+#define PORT_L_ARM 9
+#define PORT_ARM_ROTATION 5
+#define PORT_GYROSCOPE 20
+#define PORT_RING_MILL 8
+#define PORT_BASE_GRIPPER 11
+#define PORT_PNEUMATICS 'A'
 
+// Wheel specifications
+#define GEARSET_ARMS AbstractMotor::gearset::red
+#define ENCODER_UNIT_ARMS AbstractMotor::encoderUnits::rotations
+#define DIRECTION_R_ARM false
+#define DIRECTION_L_ARM true
+
+// Proportions
+#define WHEEL_DIAMETER 11_cm
+#define WHEEL_TRACK 43_cm
 
 /**
  * Runs initialization code. This occurs as soon as the program is started.
@@ -10,9 +33,10 @@ using namespace okapi;
  * All other competition modes are blocked by initialize; it is recommended
  * to keep execution time for this mode under a few seconds.
  */
-void initialize() {
+void initialize()
+{
 	pros::lcd::initialize();
-	pros::lcd::set_text(1, "Test base roulante 4 moteurs");
+	pros::lcd::set_text(1, "Test Robot");
 }
 
 /**
@@ -60,72 +84,51 @@ void autonomous() {}
  * task, not resume it from where it left off.
  */
 
-// A modifier en fonction des ports utilises pour les moteurs du test
- #define LB 1
- #define LF 12
- #define RB 10
- #define RF 11
- #define ARM 8
- #define CLAW 3
- #define WHEEL_DIAMETER 10_cm
- #define WHEEL_TRACK 31_cm
+void opcontrol()
+{
 
-void opcontrol() {
-	//create motor group for left and right
-	// One of the motors on the motorgroup has to be reversed because of design
-	Motor motorLB = Motor(LB,false,AbstractMotor::gearset::green,AbstractMotor::encoderUnits::rotations);
-	Motor motorLF = Motor(LF,false,AbstractMotor::gearset::green,AbstractMotor::encoderUnits::rotations);
-
-	Motor motorRB = Motor(RB,true,AbstractMotor::gearset::green,AbstractMotor::encoderUnits::rotations);
-	Motor motorRF = Motor(RF,true,AbstractMotor::gearset::green,AbstractMotor::encoderUnits::rotations);
-
-	Motor motorArm = Motor(ARM,false,AbstractMotor::gearset::green,AbstractMotor::encoderUnits::rotations);
-	Motor motorClaw = Motor(CLAW,true,AbstractMotor::gearset::green,AbstractMotor::encoderUnits::rotations);
-
-	const std::initializer_list<Motor> left = {motorLB, motorLF};
-	const std::initializer_list<Motor> right = {motorRB, motorRF};
-
-	std::shared_ptr<MotorGroup> grpLeft(new MotorGroup(left));
-	std::shared_ptr<MotorGroup> grpRight(new MotorGroup(right));
-
-	//Create Chassis with those two motorgroups
-	std::shared_ptr<ChassisController> drive =
-		ChassisControllerBuilder()
-			.withMotors(grpLeft,grpRight)
-			.withDimensions(AbstractMotor::gearset::green,{{WHEEL_DIAMETER,WHEEL_TRACK},imev5GreenTPR})
-			.build();
-
-	// Create controller object
+	std::shared_ptr<ChassisController> drive = base_functions::initMobileBase(PORT_FL_WHEEL,
+																			  PORT_FR_WHEEL,
+																			  PORT_BL_WHEEL,
+																			  PORT_BR_WHEEL,
+																			  WHEEL_DIAMETER,
+																			  WHEEL_TRACK);
 	Controller controller;
-	 float speedLeftX,speedLeftY,speedRightX,speedRightY;
-	 bool test = false;
-	while(true){
+	float speedLeftX, speedLeftY, speedRightX, speedRightY;
+	bool r1_pressed;
+	bool r2_pressed;
+
+	IMU gyroscope(PORT_GYROSCOPE);
+	RotationSensor armRotation(PORT_ARM_ROTATION);
+	Motor motorArmLeft = Motor(PORT_L_ARM, DIRECTION_L_ARM, GEARSET_ARMS, ENCODER_UNIT_ARMS);
+	Motor motorArmRight = Motor(PORT_R_ARM, DIRECTION_R_ARM, GEARSET_ARMS, ENCODER_UNIT_ARMS);
+
+	gyroscope.reset();
+	armRotation.reset();
+
+	while (true)
+	{
+
+		pros::lcd::print(1, "Arm Angle: %d", armRotation.get());
 
 		speedLeftY = controller.getAnalog(ControllerAnalog::leftY);
 		speedLeftX = controller.getAnalog(ControllerAnalog::leftX);
 		speedRightY = controller.getAnalog(ControllerAnalog::rightY);
 		speedRightX = controller.getAnalog(ControllerAnalog::rightX);
-		// My control mode with the two different joysticks
+		r1_pressed = controller.getDigital(ControllerDigital::R1);
+		r2_pressed = controller.getDigital(ControllerDigital::R2);
+
+		if (r1_pressed)
+		{
+			motorArmRight.moveRelative(1.0, 100);
+			motorArmLeft.moveRelative(1.0, 100);
+		}
+		else if (r2_pressed)
+		{
+			motorArmRight.moveRelative(-1.0, 100);
+			motorArmLeft.moveRelative(-1.0, 100);
+		}
+
 		drive->getModel()->arcade(speedLeftY, speedLeftX);
-
-
-		while (speedRightY == 0 ) {
-			speedRightY = controller.getAnalog(ControllerAnalog::rightY);
-			motorArm.moveAbsolute(0, 200);
-
-			// 200 car green gearset
-			motorClaw.moveVelocity(speedRightX*200);
-			motorArm.moveVelocity(speedRightY*200);
-		}
-		if (speedRightY != 0) {
-			// 200 car green gearset
-			motorClaw.moveVelocity(speedRightX*200);
-			motorArm.moveVelocity(speedRightY*200);
-		}
-
-		motorArm.tarePosition();
-
-		// motorArm.tarePosition();
-		// motorArm.moveAbsolute(0, 200);
 	}
 }
