@@ -133,10 +133,13 @@ void opcontrol()
 		if(x_pressed){
 			if(x_already_pressed){
 				ringMillMotor.moveVelocity(0);
+				x_already_pressed = false;
 			}else{
 				ringMillMotor.moveVelocity(200);
+				x_already_pressed = true;
 			}
 		}
+
 
 
 		if (r1_pressed)
