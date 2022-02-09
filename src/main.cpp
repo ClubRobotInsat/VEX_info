@@ -23,6 +23,11 @@ using namespace base_functions;
 #define DIRECTION_R_ARM false
 #define DIRECTION_L_ARM true
 
+// Ring Mill specification
+#define GEARSET_RING_MILL AbstractMotor::gearset::green
+#define ENCODER_UNIT_RING_MILL AbstractMotor::encoderUnits::rotations
+#define DIRECTION_RING_MILL false
+
 // Proportions
 #define WHEEL_DIAMETER 11_cm
 #define WHEEL_TRACK 43_cm
@@ -93,10 +98,16 @@ void opcontrol()
 																			  PORT_BR_WHEEL,
 																			  WHEEL_DIAMETER,
 																			  WHEEL_TRACK);
+
+	Motor ringMillMotor(PORT_RING_MILL,DIRECTION_RING_MILL,GEARSET_RING_MILL,ENCODER_UNIT_RING_MILL);
+
+
 	Controller controller;
 	float speedLeftX, speedLeftY, speedRightX, speedRightY;
 	bool r1_pressed;
 	bool r2_pressed;
+	bool x_pressed;
+	bool x_already_pressed;
 
 	IMU gyroscope(PORT_GYROSCOPE);
 	RotationSensor armRotation(PORT_ARM_ROTATION);
@@ -117,9 +128,20 @@ void opcontrol()
 		speedRightX = controller.getAnalog(ControllerAnalog::rightX);
 		r1_pressed = controller.getDigital(ControllerDigital::R1);
 		r2_pressed = controller.getDigital(ControllerDigital::R2);
+		x_pressed = controller.getDigital(ControllerDigital::X);
+
+		if(x_pressed){
+			if(x_already_pressed){
+				ringMillMotor.moveVelocity(0);
+			}else{
+				ringMillMotor.moveVelocity(200);
+			}
+		}
+
 
 		if (r1_pressed)
 		{
+
 			motorArmRight.moveRelative(1.0, 100);
 			motorArmLeft.moveRelative(1.0, 100);
 		}
