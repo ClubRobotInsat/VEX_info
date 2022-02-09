@@ -17,7 +17,15 @@ using namespace base_functions;
 #define PORT_BASE_GRIPPER 11
 #define PORT_PNEUMATICS 'A'
 
-// Wheel specifications
+// Wheels specifications
+#define DIRECTION_FL_WHEEL false
+#define DIRECTION_FR_WHEEL true
+#define DIRECTION_BL_WHEEL true
+#define DIRECTION_BR_WHEEL false
+#define GEARSET_WHEELS AbstractMotor::gearset::green
+#define ENCODER_UNIT_WHEELS AbstractMotor::encoderUnits::rotations
+
+// Arm specifications
 #define GEARSET_ARMS AbstractMotor::gearset::red
 #define ENCODER_UNIT_ARMS AbstractMotor::encoderUnits::rotations
 #define DIRECTION_R_ARM false
@@ -92,15 +100,18 @@ void autonomous() {}
 void opcontrol()
 {
 
-	std::shared_ptr<ChassisController> drive = base_functions::initMobileBase(PORT_FL_WHEEL,
-																			  PORT_FR_WHEEL,
-																			  PORT_BL_WHEEL,
-																			  PORT_BR_WHEEL,
-																			  WHEEL_DIAMETER,
-																			  WHEEL_TRACK);
+	Motor motorFL = Motor(PORT_FL_WHEEL, DIRECTION_FL_WHEEL, GEARSET_WHEELS, ENCODER_UNIT_WHEELS);
+	Motor motorFR = Motor(PORT_FR_WHEEL, DIRECTION_FR_WHEEL, GEARSET_WHEELS, ENCODER_UNIT_WHEELS);
+	Motor motorBL = Motor(PORT_BL_WHEEL, DIRECTION_BL_WHEEL, GEARSET_WHEELS, ENCODER_UNIT_WHEELS);
+	Motor motorBR = Motor(PORT_BR_WHEEL, DIRECTION_BR_WHEEL, GEARSET_WHEELS, ENCODER_UNIT_WHEELS);
 
-	Motor ringMillMotor(PORT_RING_MILL,DIRECTION_RING_MILL,GEARSET_RING_MILL,ENCODER_UNIT_RING_MILL);
+	const MotorGroup leftMotors = {motorBL, motorFL};
+	const MotorGroup rightMotors = {motorBR, motorFR};
 
+	std::shared_ptr<ChassisController> drive =
+		ChassisControllerBuilder().withMotors(leftMotors, rightMotors).withDimensions(GEARSET_WHEELS, {{WHEEL_DIAMETER, WHEEL_TRACK}, imev5GreenTPR}).build();
+
+	Motor ringMillMotor(PORT_RING_MILL, DIRECTION_RING_MILL, GEARSET_RING_MILL, ENCODER_UNIT_RING_MILL);
 
 	Controller controller;
 	float speedLeftX, speedLeftY, speedRightX, speedRightY;
@@ -130,17 +141,19 @@ void opcontrol()
 		r2_pressed = controller.getDigital(ControllerDigital::R2);
 		x_pressed = controller.getDigital(ControllerDigital::X);
 
-		if(x_pressed){
-			if(x_already_pressed){
+		if (x_pressed)
+		{
+			if (x_already_pressed)
+			{
 				ringMillMotor.moveVelocity(0);
 				x_already_pressed = false;
-			}else{
+			}
+			else
+			{
 				ringMillMotor.moveVelocity(200);
 				x_already_pressed = true;
 			}
 		}
-
-
 
 		if (r1_pressed)
 		{
