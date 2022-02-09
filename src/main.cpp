@@ -97,9 +97,11 @@ void autonomous() {}
  * task, not resume it from where it left off.
  */
 
+//TODO Change separate file functions for movement
+
 void opcontrol()
 {
-
+	//TODO Add pneumatics
 	Motor motorFL = Motor(PORT_FL_WHEEL, DIRECTION_FL_WHEEL, GEARSET_WHEELS, ENCODER_UNIT_WHEELS);
 	Motor motorFR = Motor(PORT_FR_WHEEL, DIRECTION_FR_WHEEL, GEARSET_WHEELS, ENCODER_UNIT_WHEELS);
 	Motor motorBL = Motor(PORT_BL_WHEEL, DIRECTION_BL_WHEEL, GEARSET_WHEELS, ENCODER_UNIT_WHEELS);
