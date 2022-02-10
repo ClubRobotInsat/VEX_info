@@ -4,29 +4,28 @@
 using namespace okapi;
 using namespace base_functions;
 
+// Sensors and Actuators ports
+#define PORT_FL_WHEEL 1
+#define PORT_FR_WHEEL 2
+#define PORT_BL_WHEEL 3
+#define PORT_BR_WHEEL 4
+#define PORT_R_ARM 10
+#define PORT_L_ARM 9
+#define PORT_ARM_ROTATION 5
+#define PORT_GYROSCOPE 20
+#define PORT_RING_MILL 8
+#define PORT_BASE_GRIPPER 11
+#define PORT_PNEUMATICS 'A'
 
-// Ports Wheels
-#define FL_WHEEL 1
-#define FR_WHEEL 2
-#define BL_WHEEL 3
-#define BR_WHEEL 4
-// Ports Arm
-#define R_ARM 10
-#define L_ARM 9
-// Port Doghnut intake
-#define INTAKE 8
-// Port Base Elevator
-#define ELEVATOR 11
-// Port Sensor
-#define GYRO 20
-// Port Antena
-#define ANTENA 21
-// Port Pneumatics
-#define PNEUMATICS 'A'
+// Wheel specifications
+#define GEARSET_ARMS AbstractMotor::gearset::red
+#define ENCODER_UNIT_ARMS AbstractMotor::encoderUnits::rotations
+#define DIRECTION_R_ARM false
+#define DIRECTION_L_ARM true
+
 // Proportions
 #define WHEEL_DIAMETER 11_cm
 #define WHEEL_TRACK 43_cm
-
 
 /**
  * Runs initialization code. This occurs as soon as the program is started.
@@ -34,11 +33,10 @@ using namespace base_functions;
  * All other competition modes are blocked by initialize; it is recommended
  * to keep execution time for this mode under a few seconds.
  */
- #define PNEU 'A'
-void initialize() {
+void initialize()
+{
 	pros::lcd::initialize();
 	pros::lcd::set_text(1, "Test Robot");
-	//pros::ADIDigitalOut piston (PNEU);
 }
 
 /**
@@ -90,24 +88,25 @@ void shut_down(Motor elevator) {
  * task, not resume it from where it left off.
  */
 
-// A modifier en fonction des ports utilises pour les moteurs du test
+void opcontrol()
+{
 
-
-void opcontrol() {
-
-	std::shared_ptr<ChassisController> drive = base_functions::initMobileBase(FL_WHEEL,
-																			FR_WHEEL,
-																			BL_WHEEL,
-																			BR_WHEEL,
-																			WHEEL_DIAMETER,
-																			WHEEL_TRACK);
-
-	// Create controller object
+	std::shared_ptr<ChassisController> drive = base_functions::initMobileBase(PORT_FL_WHEEL,
+																			  PORT_FR_WHEEL,
+																			  PORT_BL_WHEEL,
+																			  PORT_BR_WHEEL,
+																			  WHEEL_DIAMETER,
+																			  WHEEL_TRACK);
 	Controller controller;
-	float speedLeftX,speedLeftY,speedRightX,speedRightY;
+	float speedLeftX, speedLeftY, speedRightX, speedRightY;
+	bool r1_pressed;
+	bool r2_pressed;
 
-	Motor motorArmLeft = Motor(L_ARM,true,AbstractMotor::gearset::red,AbstractMotor::encoderUnits::rotations);
-	Motor motorArmRight = Motor(R_ARM,false,AbstractMotor::gearset::red,AbstractMotor::encoderUnits::rotations);
+	IMU gyroscope(PORT_GYROSCOPE);
+	RotationSensor armRotation(PORT_ARM_ROTATION);
+	Motor motorArmLeft = Motor(PORT_L_ARM, DIRECTION_L_ARM, GEARSET_ARMS, ENCODER_UNIT_ARMS);
+	Motor motorArmRight = Motor(PORT_R_ARM, DIRECTION_R_ARM, GEARSET_ARMS, ENCODER_UNIT_ARMS);
+
 
 	Motor motorElevator = Motor(ELEVATOR, false, AbstractMotor::gearset::green, AbstractMotor::encoderUnits::rotations);
 
@@ -145,41 +144,34 @@ void opcontrol() {
 
 	/*
 	while(true){
+=======
+	gyroscope.reset();
+	armRotation.reset();
+
+	while (true)
+	{
+
+		pros::lcd::print(1, "Arm Angle: %d", armRotation.get());
+
 
 		speedLeftY = controller.getAnalog(ControllerAnalog::leftY);
 		speedLeftX = controller.getAnalog(ControllerAnalog::leftX);
 		speedRightY = controller.getAnalog(ControllerAnalog::rightY);
 		speedRightX = controller.getAnalog(ControllerAnalog::rightX);
-		// My control mode with the two different joysticks
+		r1_pressed = controller.getDigital(ControllerDigital::R1);
+		r2_pressed = controller.getDigital(ControllerDigital::R2);
+
+		if (r1_pressed)
+		{
+			motorArmRight.moveRelative(1.0, 100);
+			motorArmLeft.moveRelative(1.0, 100);
+		}
+		else if (r2_pressed)
+		{
+			motorArmRight.moveRelative(-1.0, 100);
+			motorArmLeft.moveRelative(-1.0, 100);
+		}
+
 		drive->getModel()->arcade(speedLeftY, speedLeftX);
-
-
-		while (speedRightY == 0 ) {
-			speedRightY = controller.getAnalog(ControllerAnalog::rightY);
-			motorArm.moveAbsolute(0, 200);
-
-			// 200 car green gearset
-			motorClaw.moveVelocity(speedRightX*200);
-			motorArm.moveVelocity(speedRightY*200);
-		}
-		if (speedRightY != 0) {
-			// 200 car green gearset
-			motorClaw.moveVelocity(speedRightX*200);
-			motorArm.moveVelocity(speedRightY*200);
-		}
-
-		motorArm.tarePosition();
-
-		// motorArm.tarePosition();
-		// motorArm.moveAbsolute(0, 200);
-	}*/
-	/*
-	while(true){
-		pros::ADIDigitalOut piston (PNEU);
-		piston.set_value(true);
-		pros::delay(1000);
-		piston.set_value(false);
 	}
-	*/
-
 }
