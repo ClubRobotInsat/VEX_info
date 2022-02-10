@@ -122,17 +122,18 @@ void opcontrol()
 	bool r1_pressed;
 	bool r2_pressed;
 	bool x_pressed;
-	bool x_already_pressed;
 	bool y_pressed;
-	bool y_already_pressed;
 
 	IMU gyroscope(PORT_GYROSCOPE);
+	//TODO verify if rotation sensor is used with encoderADI class instead
+
 	RotationSensor armRotation(PORT_ARM_ROTATION);
 	Motor motorArmLeft = Motor(PORT_L_ARM, DIRECTION_L_ARM, GEARSET_ARMS, ENCODER_UNIT_ARMS);
 	Motor motorArmRight = Motor(PORT_R_ARM, DIRECTION_R_ARM, GEARSET_ARMS, ENCODER_UNIT_ARMS);
 
 	gyroscope.reset();
 	armRotation.reset();
+
 
 	while (true)
 	{
@@ -145,8 +146,19 @@ void opcontrol()
 		speedRightX = controller.getAnalog(ControllerAnalog::rightX);
 		r1_pressed = controller.getDigital(ControllerDigital::R1);
 		r2_pressed = controller.getDigital(ControllerDigital::R2);
+
 		x_pressed = controller.getDigital(ControllerDigital::X);
+
+
+		if(ring_mill_already_pressed){
+			controller.setText(2,0,"rigmill true\n");
+		}else{
+			controller.setText(2,0,"rigmill false\n");
+
+		}
+
 		y_pressed = controller.getDigital(ControllerDigital::Y);
+
 
 		// Ring mill
 		base_functions::activate_ring_mill(ringMillMotor, x_pressed);

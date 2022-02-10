@@ -1,13 +1,16 @@
 #include "okapi/api.hpp"
 using namespace okapi;
-namespace base_functions{
+namespace base_functions
+{
 
-    // Global variables
-    bool ring_mill_already_pressed;
-    bool pneumatic_already_pressed;
+	// Global variables
+	bool ring_mill_already_pressed = false;
+	bool pneumatic_already_pressed = false;
 
-    void activate_ring_mill(std::shared_ptr<Motor> ringMillMotor,bool button_pressed){
-        if (button_pressed)
+	// FIXME LOOPS IN TOO QUICK SO BUGGED CHANGE
+	void activate_ring_mill(std::shared_ptr<Motor> ringMillMotor, bool button_pressed)
+	{
+		if (button_pressed)
 		{
 			if (ring_mill_already_pressed)
 			{
@@ -20,10 +23,12 @@ namespace base_functions{
 				ring_mill_already_pressed = true;
 			}
 		}
-    }
+	}
 
-    void activate_penumatic(std::shared_ptr<pros::ADIPort> pneumaticPort,bool button_pressed){
-        if (button_pressed)
+	// FIXME LOOPS IN TOO QUICK SO BUGGED CHANGE
+	void activate_penumatic(std::shared_ptr<pros::ADIPort> pneumaticPort, bool button_pressed)
+	{
+		if (button_pressed)
 		{
 			if (pneumatic_already_pressed)
 			{
@@ -36,7 +41,6 @@ namespace base_functions{
 				pneumatic_already_pressed = true;
 			}
 		}
-    }
-
+	}
 
 }
