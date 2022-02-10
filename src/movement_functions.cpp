@@ -6,7 +6,8 @@ namespace base_functions{
         public:
             Motor left;
             Motor right;
-/*
+
+            /*
             Arm(u_int8_t leftPort, u_int8_t rightPort){
                 left = Motor(leftPort,true,AbstractMotor::gearset::red,AbstractMotor::encoderUnits::rotations);
                 right = Motor(rightPort,false,AbstractMotor::gearset::red,AbstractMotor::encoderUnits::rotations);
@@ -38,6 +39,18 @@ namespace base_functions{
             .build();
         return drive;
 
+    }
+
+    std::shared_ptr<AsyncVelControllerBuilder> initElevatorController(u_int8_t elevator) {
+        const IterativeVelPIDController G = 0.5;
+        Motor motorElevator = Motor(elevator, false, AbstractMotor::gearset::green, AbstractMotor::encoderUnits::rotations);
+
+        // Create the velocity controller
+        std::shared_ptr<AsyncVelControllerBuilder> velElevator =
+            AsyncVelControllerBuilder().withMotor(motorElevator)
+            .withGains(G)
+            .build();
+        return velElevator;
     }
 
 }

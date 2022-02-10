@@ -102,6 +102,8 @@ void opcontrol() {
 																			WHEEL_DIAMETER,
 																			WHEEL_TRACK);
 
+	std::shared_ptr<AsyncVelControllerBuilder> velElevator = base_functions::initElevatorController(ELEVATOR);
+
 	// Create controller object
 	Controller controller;
 	float speedLeftX,speedLeftY,speedRightX,speedRightY;
