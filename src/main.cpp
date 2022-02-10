@@ -4,29 +4,41 @@
 using namespace okapi;
 using namespace base_functions;
 
+// Sensors and Actuators ports
+#define PORT_FL_WHEEL 1
+#define PORT_FR_WHEEL 2
+#define PORT_BL_WHEEL 3
+#define PORT_BR_WHEEL 4
+#define PORT_R_ARM 10
+#define PORT_L_ARM 9
+#define PORT_ARM_ROTATION 5
+#define PORT_GYROSCOPE 20
+#define PORT_RING_MILL 8
+#define PORT_BASE_GRIPPER 11
+#define PORT_PNEUMATICS 'A'
 
-// Ports Wheels
-#define FL_WHEEL 1
-#define FR_WHEEL 2
-#define BL_WHEEL 3
-#define BR_WHEEL 4
-// Ports Arm
-#define R_ARM 10
-#define L_ARM 9
-// Port Doghnut intake
-#define INTAKE 8
-// Port Base Elevator
-#define ELEVATOR 11
-// Port Sensor
-#define GYRO 20
-// Port Antena
-#define ANTENA 21
-// Port Pneumatics
-#define PNEUMATICS 'A'
+// Wheels specifications
+#define DIRECTION_FL_WHEEL false
+#define DIRECTION_FR_WHEEL true
+#define DIRECTION_BL_WHEEL true
+#define DIRECTION_BR_WHEEL false
+#define GEARSET_WHEELS AbstractMotor::gearset::green
+#define ENCODER_UNIT_WHEELS AbstractMotor::encoderUnits::rotations
+
+// Arm specifications
+#define GEARSET_ARMS AbstractMotor::gearset::red
+#define ENCODER_UNIT_ARMS AbstractMotor::encoderUnits::rotations
+#define DIRECTION_R_ARM false
+#define DIRECTION_L_ARM true
+
+// Ring Mill specification
+#define GEARSET_RING_MILL AbstractMotor::gearset::green
+#define ENCODER_UNIT_RING_MILL AbstractMotor::encoderUnits::rotations
+#define DIRECTION_RING_MILL false
+
 // Proportions
 #define WHEEL_DIAMETER 11_cm
 #define WHEEL_TRACK 43_cm
-
 
 /**
  * Runs initialization code. This occurs as soon as the program is started.
@@ -34,11 +46,10 @@ using namespace base_functions;
  * All other competition modes are blocked by initialize; it is recommended
  * to keep execution time for this mode under a few seconds.
  */
- #define PNEU 'A'
-void initialize() {
+void initialize()
+{
 	pros::lcd::initialize();
 	pros::lcd::set_text(1, "Test Robot");
-	//pros::ADIDigitalOut piston (PNEU);
 }
 
 /**
@@ -90,28 +101,49 @@ void shut_down(Motor elevator) {
  * task, not resume it from where it left off.
  */
 
-// A modifier en fonction des ports utilises pour les moteurs du test
+void opcontrol()
+{
 
+	Motor motorFL = Motor(PORT_FL_WHEEL, DIRECTION_FL_WHEEL, GEARSET_WHEELS, ENCODER_UNIT_WHEELS);
+	Motor motorFR = Motor(PORT_FR_WHEEL, DIRECTION_FR_WHEEL, GEARSET_WHEELS, ENCODER_UNIT_WHEELS);
+	Motor motorBL = Motor(PORT_BL_WHEEL, DIRECTION_BL_WHEEL, GEARSET_WHEELS, ENCODER_UNIT_WHEELS);
+	Motor motorBR = Motor(PORT_BR_WHEEL, DIRECTION_BR_WHEEL, GEARSET_WHEELS, ENCODER_UNIT_WHEELS);
 
-void opcontrol() {
+	const MotorGroup leftMotors = {motorBL, motorFL};
+	const MotorGroup rightMotors = {motorBR, motorFR};
 
-	std::shared_ptr<ChassisController> drive = base_functions::initMobileBase(FL_WHEEL,
-																			FR_WHEEL,
-																			BL_WHEEL,
-																			BR_WHEEL,
-																			WHEEL_DIAMETER,
-																			WHEEL_TRACK);
+	std::shared_ptr<ChassisController> drive =
+		ChassisControllerBuilder().withMotors(leftMotors, rightMotors).withDimensions(GEARSET_WHEELS, {{WHEEL_DIAMETER, WHEEL_TRACK}, imev5GreenTPR}).build();
 
-	std::shared_ptr<AsyncVelControllerBuilder> velElevator = base_functions::initElevatorController(ELEVATOR);
+	std::shared_ptr<Motor> ringMillMotor(new Motor(PORT_RING_MILL, DIRECTION_RING_MILL, GEARSET_RING_MILL, ENCODER_UNIT_RING_MILL));
+	std::shared_ptr<pros::ADIPort> pneumatic(new pros::ADIPort(PORT_PNEUMATICS, ADI_DIGITAL_OUT));
+
+	std::shared_ptr<AsyncVelocityController> velElevator = base_functions::initElevatorController(PORT_BASE_GRIPPER);
+	IterativeVelPIDController::Gains::kP = 0.5;
+        Motor motorElevator = Motor(elevator, false, AbstractMotor::gearset::green, AbstractMotor::encoderUnits::rotations);
+
+        // Create the velocity controller
+        std::shared_ptr<AsyncVelControllerBuilder> velElevator =
+            AsyncVelControllerBuilder().withMotor(motorElevator)
+            .withGains(G)
+            .build();
 
 	// Create controller object
 	Controller controller;
-	float speedLeftX,speedLeftY,speedRightX,speedRightY;
+	float speedLeftX, speedLeftY, speedRightX, speedRightY;
+	bool r1_pressed;
+	bool r2_pressed;
+	bool x_pressed;
+	bool y_pressed;
 
-	Motor motorArmLeft = Motor(L_ARM,true,AbstractMotor::gearset::red,AbstractMotor::encoderUnits::rotations);
-	Motor motorArmRight = Motor(R_ARM,false,AbstractMotor::gearset::red,AbstractMotor::encoderUnits::rotations);
+	IMU gyroscope(PORT_GYROSCOPE);
 
-	Motor motorElevator = Motor(ELEVATOR, false, AbstractMotor::gearset::green, AbstractMotor::encoderUnits::rotations);
+	RotationSensor armRotation(PORT_ARM_ROTATION);
+	Motor motorArmLeft = Motor(PORT_L_ARM, DIRECTION_L_ARM, GEARSET_ARMS, ENCODER_UNIT_ARMS);
+	Motor motorArmRight = Motor(PORT_R_ARM, DIRECTION_R_ARM, GEARSET_ARMS, ENCODER_UNIT_ARMS);
+
+
+	Motor motorElevator = Motor(PORT_BASE_GRIPPER, false, AbstractMotor::gearset::green, AbstractMotor::encoderUnits::rotations);
 
 	while(!controller.getDigital(ControllerDigital::A)){
 		//pros::lcd::set_text(2, to_string(motorElevator.getPosition()));
@@ -144,44 +176,4 @@ void opcontrol() {
 	}
 
 	shut_down(motorElevator);
-
-	/*
-	while(true){
-
-		speedLeftY = controller.getAnalog(ControllerAnalog::leftY);
-		speedLeftX = controller.getAnalog(ControllerAnalog::leftX);
-		speedRightY = controller.getAnalog(ControllerAnalog::rightY);
-		speedRightX = controller.getAnalog(ControllerAnalog::rightX);
-		// My control mode with the two different joysticks
-		drive->getModel()->arcade(speedLeftY, speedLeftX);
-
-
-		while (speedRightY == 0 ) {
-			speedRightY = controller.getAnalog(ControllerAnalog::rightY);
-			motorArm.moveAbsolute(0, 200);
-
-			// 200 car green gearset
-			motorClaw.moveVelocity(speedRightX*200);
-			motorArm.moveVelocity(speedRightY*200);
-		}
-		if (speedRightY != 0) {
-			// 200 car green gearset
-			motorClaw.moveVelocity(speedRightX*200);
-			motorArm.moveVelocity(speedRightY*200);
-		}
-
-		motorArm.tarePosition();
-
-		// motorArm.tarePosition();
-		// motorArm.moveAbsolute(0, 200);
-	}*/
-	/*
-	while(true){
-		pros::ADIDigitalOut piston (PNEU);
-		piston.set_value(true);
-		pros::delay(1000);
-		piston.set_value(false);
-	}
-	*/
-
 }
