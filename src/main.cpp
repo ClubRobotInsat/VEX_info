@@ -70,6 +70,10 @@ void competition_initialize() {}
  */
 void autonomous() {}
 
+void shut_down(Motor elevator) {
+	elevator.moveAbsolute(0.0, 50);
+}
+
 /**
  * Runs the operator control code. This function will be started in its own task
  * with the default priority and stack size whenever the robot is enabled via
@@ -103,6 +107,44 @@ void opcontrol()
 	Motor motorArmLeft = Motor(PORT_L_ARM, DIRECTION_L_ARM, GEARSET_ARMS, ENCODER_UNIT_ARMS);
 	Motor motorArmRight = Motor(PORT_R_ARM, DIRECTION_R_ARM, GEARSET_ARMS, ENCODER_UNIT_ARMS);
 
+
+	Motor motorElevator = Motor(ELEVATOR, false, AbstractMotor::gearset::green, AbstractMotor::encoderUnits::rotations);
+
+	while(!controller.getDigital(ControllerDigital::A)){
+		//pros::lcd::set_text(2, to_string(motorElevator.getPosition()));
+
+		controller.setText(2, 0, to_string(motorElevator.getPosition()));
+
+		speedLeftY = controller.getAnalog(ControllerAnalog::leftY);
+		speedLeftX = controller.getAnalog(ControllerAnalog::leftX);
+		speedRightY = controller.getAnalog(ControllerAnalog::rightY);
+		speedRightX = controller.getAnalog(ControllerAnalog::rightX);
+		// My control mode with the two different joysticks
+		if(controller.getDigital(ControllerDigital::R1)){
+			motorArmRight.moveRelative(1.0,100);
+			motorArmLeft.moveRelative(1.0,100);
+		}else if(controller.getDigital(ControllerDigital::R2)){
+			motorArmRight.moveRelative(-1.0,100);
+			motorArmLeft.moveRelative(-1.0,100);
+		}else if(controller.getDigital(ControllerDigital::L2) && (motorElevator.getPosition())>-1.5){
+			motorElevator.moveAbsolute(-1.55,150);
+		}else if(controller.getDigital(ControllerDigital::L1) && (motorElevator.getPosition())<0.1){
+			motorElevator.moveRelative(0.5,200);
+		}
+		
+		/*else{
+			motorArmLeft.moveRelative(0,100);
+			motorArmRight.moveRelative(0,100);
+		}*/
+		//TODO Set limit for arm
+		drive->getModel()->arcade(speedLeftY, speedLeftX);
+	}
+
+	shut_down(motorElevator);
+
+	/*
+	while(true){
+=======
 	gyroscope.reset();
 	armRotation.reset();
 
@@ -110,6 +152,7 @@ void opcontrol()
 	{
 
 		pros::lcd::print(1, "Arm Angle: %d", armRotation.get());
+
 
 		speedLeftY = controller.getAnalog(ControllerAnalog::leftY);
 		speedLeftX = controller.getAnalog(ControllerAnalog::leftX);
