@@ -17,11 +17,24 @@ using namespace base_functions;
 #define PORT_BASE_GRIPPER 11
 #define PORT_PNEUMATICS 'A'
 
-// Wheel specifications
+// Wheels specifications
+#define DIRECTION_FL_WHEEL false
+#define DIRECTION_FR_WHEEL true
+#define DIRECTION_BL_WHEEL true
+#define DIRECTION_BR_WHEEL false
+#define GEARSET_WHEELS AbstractMotor::gearset::green
+#define ENCODER_UNIT_WHEELS AbstractMotor::encoderUnits::rotations
+
+// Arm specifications
 #define GEARSET_ARMS AbstractMotor::gearset::red
 #define ENCODER_UNIT_ARMS AbstractMotor::encoderUnits::rotations
 #define DIRECTION_R_ARM false
 #define DIRECTION_L_ARM true
+
+// Ring Mill specification
+#define GEARSET_RING_MILL AbstractMotor::gearset::green
+#define ENCODER_UNIT_RING_MILL AbstractMotor::encoderUnits::rotations
+#define DIRECTION_RING_MILL false
 
 // Proportions
 #define WHEEL_DIAMETER 11_cm
@@ -87,24 +100,36 @@ void autonomous() {}
 void opcontrol()
 {
 
-	std::shared_ptr<ChassisController> drive = base_functions::initMobileBase(PORT_FL_WHEEL,
-																			  PORT_FR_WHEEL,
-																			  PORT_BL_WHEEL,
-																			  PORT_BR_WHEEL,
-																			  WHEEL_DIAMETER,
-																			  WHEEL_TRACK);
+	Motor motorFL = Motor(PORT_FL_WHEEL, DIRECTION_FL_WHEEL, GEARSET_WHEELS, ENCODER_UNIT_WHEELS);
+	Motor motorFR = Motor(PORT_FR_WHEEL, DIRECTION_FR_WHEEL, GEARSET_WHEELS, ENCODER_UNIT_WHEELS);
+	Motor motorBL = Motor(PORT_BL_WHEEL, DIRECTION_BL_WHEEL, GEARSET_WHEELS, ENCODER_UNIT_WHEELS);
+	Motor motorBR = Motor(PORT_BR_WHEEL, DIRECTION_BR_WHEEL, GEARSET_WHEELS, ENCODER_UNIT_WHEELS);
+
+	const MotorGroup leftMotors = {motorBL, motorFL};
+	const MotorGroup rightMotors = {motorBR, motorFR};
+
+	std::shared_ptr<ChassisController> drive =
+		ChassisControllerBuilder().withMotors(leftMotors, rightMotors).withDimensions(GEARSET_WHEELS, {{WHEEL_DIAMETER, WHEEL_TRACK}, imev5GreenTPR}).build();
+
+	std::shared_ptr<Motor> ringMillMotor(new Motor(PORT_RING_MILL, DIRECTION_RING_MILL, GEARSET_RING_MILL, ENCODER_UNIT_RING_MILL));
+	std::shared_ptr<pros::ADIPort> pneumatic(new pros::ADIPort(PORT_PNEUMATICS, ADI_DIGITAL_OUT));
+
 	Controller controller;
 	float speedLeftX, speedLeftY, speedRightX, speedRightY;
 	bool r1_pressed;
 	bool r2_pressed;
+	bool x_pressed;
+	bool y_pressed;
 
 	IMU gyroscope(PORT_GYROSCOPE);
+
 	RotationSensor armRotation(PORT_ARM_ROTATION);
 	Motor motorArmLeft = Motor(PORT_L_ARM, DIRECTION_L_ARM, GEARSET_ARMS, ENCODER_UNIT_ARMS);
 	Motor motorArmRight = Motor(PORT_R_ARM, DIRECTION_R_ARM, GEARSET_ARMS, ENCODER_UNIT_ARMS);
 
 	gyroscope.reset();
 	armRotation.reset();
+
 
 	while (true)
 	{
@@ -118,8 +143,28 @@ void opcontrol()
 		r1_pressed = controller.getDigital(ControllerDigital::R1);
 		r2_pressed = controller.getDigital(ControllerDigital::R2);
 
+		x_pressed = controller.getDigital(ControllerDigital::X);
+
+
+		if(ring_mill_already_pressed){
+			controller.setText(2,0,"rigmill true\n");
+		}else{
+			controller.setText(2,0,"rigmill false\n");
+
+		}
+
+		y_pressed = controller.getDigital(ControllerDigital::Y);
+
+
+		// Ring mill
+		base_functions::activate_ring_mill(ringMillMotor, x_pressed);
+
+		// Pneumatic
+		base_functions::activate_pneumatic(pneumatic, y_pressed);
+
 		if (r1_pressed)
 		{
+
 			motorArmRight.moveRelative(1.0, 100);
 			motorArmLeft.moveRelative(1.0, 100);
 		}
