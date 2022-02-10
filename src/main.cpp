@@ -97,8 +97,6 @@ void autonomous() {}
  * task, not resume it from where it left off.
  */
 
-// TODO Change separate file functions for movement
-
 void opcontrol()
 {
 
@@ -113,7 +111,6 @@ void opcontrol()
 	std::shared_ptr<ChassisController> drive =
 		ChassisControllerBuilder().withMotors(leftMotors, rightMotors).withDimensions(GEARSET_WHEELS, {{WHEEL_DIAMETER, WHEEL_TRACK}, imev5GreenTPR}).build();
 
-	// TODO check if this is okayish way to use shared pointers
 	std::shared_ptr<Motor> ringMillMotor(new Motor(PORT_RING_MILL, DIRECTION_RING_MILL, GEARSET_RING_MILL, ENCODER_UNIT_RING_MILL));
 	std::shared_ptr<pros::ADIPort> pneumatic(new pros::ADIPort(PORT_PNEUMATICS, ADI_DIGITAL_OUT));
 
@@ -125,7 +122,6 @@ void opcontrol()
 	bool y_pressed;
 
 	IMU gyroscope(PORT_GYROSCOPE);
-	//TODO verify if rotation sensor is used with encoderADI class instead
 
 	RotationSensor armRotation(PORT_ARM_ROTATION);
 	Motor motorArmLeft = Motor(PORT_L_ARM, DIRECTION_L_ARM, GEARSET_ARMS, ENCODER_UNIT_ARMS);
@@ -164,7 +160,7 @@ void opcontrol()
 		base_functions::activate_ring_mill(ringMillMotor, x_pressed);
 
 		// Pneumatic
-		base_functions::activate_penumatic(pneumatic, y_pressed);
+		base_functions::activate_pneumatic(pneumatic, y_pressed);
 
 		if (r1_pressed)
 		{

@@ -9,5 +9,5 @@ namespace base_functions{
 
 
         void activate_ring_mill(std::shared_ptr<Motor> ringMillMotor,bool button_pressed);
-        void activate_penumatic(std::shared_ptr<pros::ADIPort> pneumaticPort,bool button_pressed);
+        void activate_pneumatic(std::shared_ptr<pros::ADIPort> pneumaticPort,bool button_pressed);
 }

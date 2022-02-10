@@ -26,7 +26,7 @@ namespace base_functions
 	}
 
 	// FIXME LOOPS IN TOO QUICK SO BUGGED CHANGE
-	void activate_penumatic(std::shared_ptr<pros::ADIPort> pneumaticPort, bool button_pressed)
+	void activate_pneumatic(std::shared_ptr<pros::ADIPort> pneumaticPort, bool button_pressed)
 	{
 		if (button_pressed)
 		{
