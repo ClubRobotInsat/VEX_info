@@ -111,7 +111,7 @@ void opcontrol() {
 
 	Motor motorElevator = Motor(ELEVATOR, false, AbstractMotor::gearset::green, AbstractMotor::encoderUnits::rotations);
 
-	while(!controller.getDigital(ControllerDigital::X)){
+	while(!controller.getDigital(ControllerDigital::A)){
 		//pros::lcd::set_text(2, to_string(motorElevator.getPosition()));
 
 		controller.setText(2, 0, to_string(motorElevator.getPosition()));
