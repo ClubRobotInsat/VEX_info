@@ -104,6 +104,7 @@ void shut_down(Motor elevator) {
 void opcontrol()
 {
 
+	// ================ Definition des moteurs du chassis ================================
 	Motor motorFL = Motor(PORT_FL_WHEEL, DIRECTION_FL_WHEEL, GEARSET_WHEELS, ENCODER_UNIT_WHEELS);
 	Motor motorFR = Motor(PORT_FR_WHEEL, DIRECTION_FR_WHEEL, GEARSET_WHEELS, ENCODER_UNIT_WHEELS);
 	Motor motorBL = Motor(PORT_BL_WHEEL, DIRECTION_BL_WHEEL, GEARSET_WHEELS, ENCODER_UNIT_WHEELS);
@@ -118,15 +119,15 @@ void opcontrol()
 	std::shared_ptr<Motor> ringMillMotor(new Motor(PORT_RING_MILL, DIRECTION_RING_MILL, GEARSET_RING_MILL, ENCODER_UNIT_RING_MILL));
 	std::shared_ptr<pros::ADIPort> pneumatic(new pros::ADIPort(PORT_PNEUMATICS, ADI_DIGITAL_OUT));
 
-	std::shared_ptr<AsyncVelocityController> velElevator = base_functions::initElevatorController(PORT_BASE_GRIPPER);
-	IterativeVelPIDController::Gains::kP = 0.5;
-        Motor motorElevator = Motor(elevator, false, AbstractMotor::gearset::green, AbstractMotor::encoderUnits::rotations);
 
-        // Create the velocity controller
-        std::shared_ptr<AsyncVelControllerBuilder> velElevator =
-            AsyncVelControllerBuilder().withMotor(motorElevator)
-            .withGains(G)
-            .build();
+	// ================= Definition du PID pour le moteur de l'elevateur ===================
+	IterativeVelPIDController::Gains pid;
+	pid.kP = 0.5;
+    Motor motorElevator = Motor(PORT_BASE_GRIPPER, false, AbstractMotor::gearset::green, AbstractMotor::encoderUnits::rotations);
+
+	// Create the velocity controller
+    std::shared_ptr<AsyncVelControllerBuilder> velElevator =
+            AsyncVelControllerBuilder().withMotor(motorElevator).withGains(pid.kP).build();
 
 	// Create controller object
 	Controller controller;
