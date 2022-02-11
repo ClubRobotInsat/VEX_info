@@ -24,7 +24,7 @@ namespace base_functions
 				ringMillMotor->moveVelocity(OFF);
 				button_last_state_ring_mill = false;
 			}
-			else{
+			if(!button_last_state_ring_mill){
 				ringMillMotor->moveVelocity(ON);
 				button_last_state_ring_mill = true;
 			}
@@ -39,13 +39,13 @@ namespace base_functions
 		Rate delay ;
 		delay.delayUntil(25);
 		if (button_pressed){
-			if(button_last_state_ring_mill){
+			if(button_last_state_pneumatic){
 				pneumaticPort->set_value(LOW);
-				button_last_state_ring_mill = false;
+				button_last_state_pneumatic = false;
 			}
-			else{
+			if(!button_last_state_pneumatic){
 				pneumaticPort->set_value(HIGH);
-				button_last_state_ring_mill = true;
+				button_last_state_pneumatic = true;
 			}
 		}
 	}
