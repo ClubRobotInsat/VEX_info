@@ -43,4 +43,31 @@ namespace base_functions
 		}
 	}
 
+	// =================== Regarder en bas =========================
+
+	void opcontrol(auto velController, double target) {
+		// Execute the movement
+		
+	}
+
+	void lower_harm(std::shared_ptr<AsyncVelControllerBuilder> vc,
+					std::shared_ptr<Motor> m,
+					int port_base_gripper) {
+		TimeUtil t();
+		const double kP = 1.0;
+		const double kI = 0.001;
+		const double kD = 0.1;
+		const double target = 1.5;
+
+		auto velControl = AsyncVelControllerBuilder()
+					.withMotor(port_base_gripper)
+					.withGains({kP, kI, kD})
+					.build();
+
+		opcontrol(velControl, target);
+	}
+
+	// S'inspirer de ce qu'ils ont fait pour les AsyncVelPIDController
+	// Et librairies okapi
+	// https://github.com/OkapiLib/OkapiLib/tree/master/test
 }

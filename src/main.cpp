@@ -83,8 +83,8 @@ void competition_initialize() {}
  */
 void autonomous() {}
 
-void shut_down(Motor elevator) {
-	elevator.moveAbsolute(0.0, 50);
+void shut_down(std::shared_ptr<Motor> elevator) {
+	elevator->moveAbsolute(0.0, 50);
 }
 
 /**
@@ -104,7 +104,7 @@ void shut_down(Motor elevator) {
 void opcontrol()
 {
 
-	// ================ Definition des moteurs du chassis ================================
+	// ======================== Definition des moteurs du chassis ===========================
 	Motor motorFL = Motor(PORT_FL_WHEEL, DIRECTION_FL_WHEEL, GEARSET_WHEELS, ENCODER_UNIT_WHEELS);
 	Motor motorFR = Motor(PORT_FR_WHEEL, DIRECTION_FR_WHEEL, GEARSET_WHEELS, ENCODER_UNIT_WHEELS);
 	Motor motorBL = Motor(PORT_BL_WHEEL, DIRECTION_BL_WHEEL, GEARSET_WHEELS, ENCODER_UNIT_WHEELS);
@@ -120,16 +120,7 @@ void opcontrol()
 	std::shared_ptr<pros::ADIPort> pneumatic(new pros::ADIPort(PORT_PNEUMATICS, ADI_DIGITAL_OUT));
 
 
-	// ================= Definition du PID pour le moteur de l'elevateur ===================
-	IterativeVelPIDController::Gains pid;
-	pid.kP = 0.5;
-    Motor motorElevator = Motor(PORT_BASE_GRIPPER, false, AbstractMotor::gearset::green, AbstractMotor::encoderUnits::rotations);
-
-	// Create the velocity controller
-    std::shared_ptr<AsyncVelControllerBuilder> velElevator =
-            AsyncVelControllerBuilder().withMotor(motorElevator).withGains(pid.kP).build();
-
-	// Create controller object
+	// ============================ Create controller object ===============================
 	Controller controller;
 	float speedLeftX, speedLeftY, speedRightX, speedRightY;
 	bool r1_pressed;
@@ -144,12 +135,41 @@ void opcontrol()
 	Motor motorArmRight = Motor(PORT_R_ARM, DIRECTION_R_ARM, GEARSET_ARMS, ENCODER_UNIT_ARMS);
 
 
-	Motor motorElevator = Motor(PORT_BASE_GRIPPER, false, AbstractMotor::gearset::green, AbstractMotor::encoderUnits::rotations);
+	// ================= Definition du PID pour le moteur de l'elevateur ===================
+	/*
+	IterativeVelPIDController::Gains pid;
+	pid.kP = 0.5;
+    Motor motorElevator = Motor(PORT_BASE_GRIPPER, false, AbstractMotor::gearset::green, AbstractMotor::encoderUnits::rotations);
+
+	// Create the velocity controller
+    std::shared_ptr<AsyncVelControllerBuilder> velElevator =
+            AsyncVelControllerBuilder().withMotor(motorElevator).withGains(pid.kP).build();
+	*/
+
+	/*
+	double kP = 0.5; 
+	double kD = 0; 
+	double kF = 0; 
+	double kSF = 0;
+
+	QTime t = 10_ms;
+
+	PassthroughFilter filter();
+
+	AbstractTimer loopTimer(t);
+
+	VelMath vm(200, filter, t, loopTimer);
+
+	IterativeVelPIDController PIDcontroller(kP, kD, kF, kSF, vm, t, filter); 
+	*/
+
+	const std::shared_ptr<AsyncVelControllerBuilder> velControl(new AsyncVelControllerBuilder());
+	const std::shared_ptr<Motor> motorElevator(new Motor(PORT_BASE_GRIPPER, false, AbstractMotor::gearset::green, AbstractMotor::encoderUnits::rotations));
 
 	while(!controller.getDigital(ControllerDigital::A)){
 		//pros::lcd::set_text(2, to_string(motorElevator.getPosition()));
 
-		controller.setText(2, 0, to_string(motorElevator.getPosition()));
+		controller.setText(2, 0, to_string(motorElevator->getPosition()));
 
 		speedLeftY = controller.getAnalog(ControllerAnalog::leftY);
 		speedLeftX = controller.getAnalog(ControllerAnalog::leftX);
@@ -162,10 +182,10 @@ void opcontrol()
 		}else if(controller.getDigital(ControllerDigital::R2)){
 			motorArmRight.moveRelative(-1.0,100);
 			motorArmLeft.moveRelative(-1.0,100);
-		}else if(controller.getDigital(ControllerDigital::L2) && (motorElevator.getPosition())>-1.5){
-			motorElevator.moveAbsolute(-1.55,150);
-		}else if(controller.getDigital(ControllerDigital::L1) && (motorElevator.getPosition())<0.1){
-			motorElevator.moveRelative(0.5,200);
+		}else if(controller.getDigital(ControllerDigital::L2) && (motorElevator->getPosition())>-1.5){
+			motorElevator->moveAbsolute(-1.55,150);
+		}else if(controller.getDigital(ControllerDigital::L1) && (motorElevator->getPosition())<0.1){
+			motorElevator->moveRelative(0.5,200);
 		}
 		
 		/*else{
