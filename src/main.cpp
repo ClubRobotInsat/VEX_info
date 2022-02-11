@@ -121,6 +121,8 @@ void opcontrol()
 	bool x_pressed;
 	bool y_pressed;
 
+	ControllerButton x = ControllerButton(ControllerDigital::X);
+
 	IMU gyroscope(PORT_GYROSCOPE);
 
 	RotationSensor armRotation(PORT_ARM_ROTATION);
@@ -134,6 +136,7 @@ void opcontrol()
 	while (true)
 	{
 
+
 		pros::lcd::print(1, "Arm Angle: %d", armRotation.get());
 
 		speedLeftY = controller.getAnalog(ControllerAnalog::leftY);
@@ -142,22 +145,13 @@ void opcontrol()
 		speedRightX = controller.getAnalog(ControllerAnalog::rightX);
 		r1_pressed = controller.getDigital(ControllerDigital::R1);
 		r2_pressed = controller.getDigital(ControllerDigital::R2);
-
 		x_pressed = controller.getDigital(ControllerDigital::X);
-
-
-		if(ring_mill_already_pressed){
-			controller.setText(2,0,"rigmill true\n");
-		}else{
-			controller.setText(2,0,"rigmill false\n");
-
-		}
-
 		y_pressed = controller.getDigital(ControllerDigital::Y);
 
 
 		// Ring mill
 		base_functions::activate_ring_mill(ringMillMotor, x_pressed);
+
 
 		// Pneumatic
 		base_functions::activate_pneumatic(pneumatic, y_pressed);
@@ -176,4 +170,5 @@ void opcontrol()
 
 		drive->getModel()->arcade(speedLeftY, speedLeftX);
 	}
+
 }
