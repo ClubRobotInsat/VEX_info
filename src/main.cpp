@@ -1,6 +1,5 @@
 #include "main.h"
 #include "okapi/api.hpp"
-#include "base_functions.h"
 
 using namespace okapi;
 
@@ -35,6 +34,7 @@ using namespace okapi;
 #define GEARSET_RING_MILL AbstractMotor::gearset::green
 #define ENCODER_UNIT_RING_MILL AbstractMotor::encoderUnits::rotations
 #define DIRECTION_RING_MILL false
+#define MAX_VELOCITY_RING_MILL 200
 
 // Base Gripper specification
 #define DIRECTION_BASE_GRIPPER true
@@ -60,6 +60,7 @@ RotationSensor armRotation = RotationSensor(PORT_ARM_ROTATION);
 Motor motorArmLeft = Motor(PORT_L_ARM, DIRECTION_L_ARM, GEARSET_ARMS, ENCODER_UNIT_ARMS);
 Motor motorArmRight = Motor(PORT_R_ARM, DIRECTION_R_ARM, GEARSET_ARMS, ENCODER_UNIT_ARMS);
 Motor motorElevator = Motor(PORT_BASE_GRIPPER, DIRECTION_BASE_GRIPPER, GEARSET_BASE_GRIPPER, ENCODER_UNIT_BASE_GRIPPER);
+std::shared_ptr<ChassisController> drive;
 
 /**
  * Runs initialization code. This occurs as soon as the program is started.
@@ -71,6 +72,12 @@ void initialize()
 {
 	pros::lcd::initialize();
 	motorElevator.setBrakeMode(AbstractMotor::brakeMode::hold);
+	const MotorGroup leftMotors = {motorBL, motorFL};
+	const MotorGroup rightMotors = {motorBR, motorFR};
+	drive = ChassisControllerBuilder()
+				.withMotors(leftMotors, rightMotors)
+				.withDimensions(GEARSET_WHEELS, {{WHEEL_DIAMETER, WHEEL_TRACK}, imev5GreenTPR})
+				.build();
 }
 
 /**
@@ -120,34 +127,65 @@ void autonomous() {}
 
 void opcontrol()
 {
-	const MotorGroup leftMotors = {motorBL, motorFL};
-	const MotorGroup rightMotors = {motorBR, motorFR};
+	bool execute = true;
+	bool pneumatic_activated = false;
+	bool pneumatic_debounce = false;
+	bool ringmill_activated = false;
+	bool ringmill_debounce = false;
 
-	auto drive =
-		ChassisControllerBuilder()
-			.withMotors(leftMotors, rightMotors)
-			.withDimensions(GEARSET_WHEELS, {{WHEEL_DIAMETER, WHEEL_TRACK}, imev5GreenTPR})
-			.build();
-
-	while (!controller.getDigital(ControllerDigital::A))
+	while (execute)
 	{
 		if (controller.getDigital(ControllerDigital::R1))
 		{
 			motorArmRight.moveRelative(1.0, 100);
 			motorArmLeft.moveRelative(1.0, 100);
 		}
-		else if (controller.getDigital(ControllerDigital::R2))
+		if (controller.getDigital(ControllerDigital::R2))
 		{
 			motorArmRight.moveRelative(-1.0, 100);
 			motorArmLeft.moveRelative(-1.0, 100);
 		}
-		else if (controller.getDigital(ControllerDigital::L2))
+		if (controller.getDigital(ControllerDigital::L2))
 		{
-			motorElevator.moveRelative(30*GEAR_RATIO_BASE_GRIPPER, 30);
+			motorElevator.moveRelative(30 * GEAR_RATIO_BASE_GRIPPER, 30);
 		}
-		else if (controller.getDigital(ControllerDigital::L1))
+		if (controller.getDigital(ControllerDigital::L1))
 		{
-			motorElevator.moveRelative(-30*GEAR_RATIO_BASE_GRIPPER, 30);
+			motorElevator.moveRelative(-30 * GEAR_RATIO_BASE_GRIPPER, 30);
+		}
+		if (controller.getDigital(ControllerDigital::A))
+		{
+			execute = false;
+		}
+		if (controller.getDigital(ControllerDigital::Y))
+		{
+			if (!pneumatic_debounce) {
+				pneumatic_activated = !pneumatic_activated;
+				pneumatic_debounce = true;
+			}
+		} else {
+			pneumatic_debounce = false;
+		}
+		if (controller.getDigital(ControllerDigital::X))
+		{
+			if (!ringmill_debounce) {
+				ringmill_activated = !ringmill_activated;
+				ringmill_debounce = true;
+			}
+		} else {
+			ringmill_debounce = false;
+		}
+
+		if (pneumatic_activated) {
+			pneumatic.set_value(1);
+		} else {
+			pneumatic.set_value(0);
+		}
+
+		if (ringmill_activated) {
+			ringMillMotor.moveVelocity(MAX_VELOCITY_RING_MILL);
+		} else {
+			ringMillMotor.moveVelocity(0);
 		}
 
 		drive->getModel()->arcade(
