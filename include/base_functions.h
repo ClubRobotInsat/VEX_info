@@ -11,5 +11,13 @@ namespace base_functions{
         void activate_ring_mill(std::shared_ptr<Motor> ringMillMotor,bool button_pressed);
         void activate_pneumatic(std::shared_ptr<pros::ADIPort> pneumaticPort,bool button_pressed);
         void lower_harm(std::shared_ptr<AsyncVelControllerBuilder> vc,int port_base_gripper);
-        void opcontrol(auto controllerPID, double target);
+        //void opcontrol(auto controllerPID, double target);
+
+        class MyTimer : public AbstractTimer {
+
+		MyTimer(QTime init) : AbstractTimer(init){};
+
+		QTime millis() const override{};
+
+	};
 }

@@ -7,7 +7,6 @@ namespace base_functions
 	bool ring_mill_already_pressed = false;
 	bool pneumatic_already_pressed = false;
 
-	// FIXME LOOPS IN TOO QUICK SO BUGGED CHANGE
 	void activate_ring_mill(std::shared_ptr<Motor> ringMillMotor, bool button_pressed)
 	{
 		if (button_pressed)
@@ -25,7 +24,6 @@ namespace base_functions
 		}
 	}
 
-	// FIXME LOOPS IN TOO QUICK SO BUGGED CHANGE
 	void activate_pneumatic(std::shared_ptr<pros::ADIPort> pneumaticPort, bool button_pressed)
 	{
 		if (button_pressed)
@@ -43,11 +41,24 @@ namespace base_functions
 		}
 	}
 
+	class MyTimer : public AbstractTimer {
+
+		MyTimer(QTime init) : AbstractTimer(init){
+			this->firstCalled = init;
+		};
+
+		QTime millis() const override {
+			uint32_t currentTime = pros::millis();
+			return QTime(static_cast<double>(currentTime));
+		}
+
+	};
+
 	// =================== Regarder en bas =========================
 
-	void opcontrol(auto velController, double target) {
+	/*void opcontrol(auto velController, double target) {
 		// Execute the movement
-		
+
 	}
 
 	void lower_harm(std::shared_ptr<AsyncVelControllerBuilder> vc,
@@ -70,4 +81,5 @@ namespace base_functions
 	// S'inspirer de ce qu'ils ont fait pour les AsyncVelPIDController
 	// Et librairies okapi
 	// https://github.com/OkapiLib/OkapiLib/tree/master/test
+	*/
 }

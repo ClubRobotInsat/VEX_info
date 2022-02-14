@@ -147,9 +147,9 @@ void opcontrol()
 	*/
 
 	/*
-	double kP = 0.5; 
-	double kD = 0; 
-	double kF = 0; 
+	double kP = 0.5;
+	double kD = 0;
+	double kF = 0;
 	double kSF = 0;
 
 	QTime t = 10_ms;
@@ -160,11 +160,33 @@ void opcontrol()
 
 	VelMath vm(200, filter, t, loopTimer);
 
-	IterativeVelPIDController PIDcontroller(kP, kD, kF, kSF, vm, t, filter); 
+	IterativeVelPIDController PIDcontroller(kP, kD, kF, kSF, vm, t, filter);
 	*/
 
-	const std::shared_ptr<AsyncVelControllerBuilder> velControl(new AsyncVelControllerBuilder());
+	//const std::shared_ptr<AsyncVelControllerBuilder> velControl(new AsyncVelControllerBuilder());
 	const std::shared_ptr<Motor> motorElevator(new Motor(PORT_BASE_GRIPPER, false, AbstractMotor::gearset::green, AbstractMotor::encoderUnits::rotations));
+
+	// Definition of an async controller for the elevator
+	const double kP = 0.5;
+	const double kI = 0;
+	const double kD = 0;
+
+	IterativeVelPIDController::Gains gains{kP,kI,kD,0};
+	const std::shared_ptr<IterativeVelPIDController::Gains> igains(new IterativeVelPIDController::Gains);
+	igains->kD = kD;
+	igains->kP = kD;
+	igains->kF = kI;
+	igains->kSF = 0.0;
+	auto  iTimer = std::make_unique<MyTimer>(0_ms);
+	// 1800 ticks/rev with 36:1 gears => red
+	// 900 ticks/rev with 18:1 gears => green
+	// 300 ticks/rev with 6:1 gears => blue
+
+	const auto controllerPID = AsyncVelControllerBuilder().withMotor(motorElevator).withGains(gains)
+													.withVelMath(std::make_unique<VelMath>(900,std::make_unique<PassthroughFilter>(),2_ms,iTimer))
+													.build();
+
+
 
 	while(!controller.getDigital(ControllerDigital::A)){
 		//pros::lcd::set_text(2, to_string(motorElevator.getPosition()));
@@ -187,11 +209,7 @@ void opcontrol()
 		}else if(controller.getDigital(ControllerDigital::L1) && (motorElevator->getPosition())<0.1){
 			motorElevator->moveRelative(0.5,200);
 		}
-		
-		/*else{
-			motorArmLeft.moveRelative(0,100);
-			motorArmRight.moveRelative(0,100);
-		}*/
+
 		//TODO Set limit for arm
 		drive->getModel()->arcade(speedLeftY, speedLeftX);
 	}
