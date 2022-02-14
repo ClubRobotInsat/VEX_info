@@ -41,19 +41,6 @@ namespace base_functions
 		}
 	}
 
-	class MyTimer : public AbstractTimer {
-
-		MyTimer(QTime init) : AbstractTimer(init){
-			this->firstCalled = init;
-		};
-
-		QTime millis() const override {
-			uint32_t currentTime = pros::millis();
-			return QTime(static_cast<double>(currentTime));
-		}
-
-	};
-
 	// =================== Regarder en bas =========================
 
 	/*void opcontrol(auto velController, double target) {
