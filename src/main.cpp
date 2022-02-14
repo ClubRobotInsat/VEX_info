@@ -1,8 +1,7 @@
 #include "main.h"
 #include "okapi/api.hpp"
-#include "base_functions.h"
+
 using namespace okapi;
-using namespace base_functions;
 
 // Sensors and Actuators ports
 #define PORT_FL_WHEEL 1
@@ -27,7 +26,7 @@ using namespace base_functions;
 
 // Arm specifications
 #define GEARSET_ARMS AbstractMotor::gearset::red
-#define ENCODER_UNIT_ARMS AbstractMotor::encoderUnits::rotations
+#define ENCODER_UNIT_ARMS AbstractMotor::encoderUnits::degrees
 #define DIRECTION_R_ARM false
 #define DIRECTION_L_ARM true
 
@@ -35,10 +34,33 @@ using namespace base_functions;
 #define GEARSET_RING_MILL AbstractMotor::gearset::green
 #define ENCODER_UNIT_RING_MILL AbstractMotor::encoderUnits::rotations
 #define DIRECTION_RING_MILL false
+#define MAX_VELOCITY_RING_MILL 200
+
+// Base Gripper specification
+#define DIRECTION_BASE_GRIPPER true
+#define GEARSET_BASE_GRIPPER AbstractMotor::gearset::green
+#define ENCODER_UNIT_BASE_GRIPPER AbstractMotor::encoderUnits::degrees
+#define GEAR_RATIO_BASE_GRIPPER 5
 
 // Proportions
 #define WHEEL_DIAMETER 11_cm
 #define WHEEL_TRACK 43_cm
+
+// Global variables - sensors and actuators
+
+Controller controller;
+Motor motorFL = Motor(PORT_FL_WHEEL, DIRECTION_FL_WHEEL, GEARSET_WHEELS, ENCODER_UNIT_WHEELS);
+Motor motorFR = Motor(PORT_FR_WHEEL, DIRECTION_FR_WHEEL, GEARSET_WHEELS, ENCODER_UNIT_WHEELS);
+Motor motorBL = Motor(PORT_BL_WHEEL, DIRECTION_BL_WHEEL, GEARSET_WHEELS, ENCODER_UNIT_WHEELS);
+Motor motorBR = Motor(PORT_BR_WHEEL, DIRECTION_BR_WHEEL, GEARSET_WHEELS, ENCODER_UNIT_WHEELS);
+Motor ringMillMotor = Motor(PORT_RING_MILL, DIRECTION_RING_MILL, GEARSET_RING_MILL, ENCODER_UNIT_RING_MILL);
+pros::ADIPort pneumatic = pros::ADIPort(PORT_PNEUMATICS, ADI_DIGITAL_OUT);
+IMU gyroscope = IMU(PORT_GYROSCOPE);
+RotationSensor armRotation = RotationSensor(PORT_ARM_ROTATION);
+Motor motorArmLeft = Motor(PORT_L_ARM, DIRECTION_L_ARM, GEARSET_ARMS, ENCODER_UNIT_ARMS);
+Motor motorArmRight = Motor(PORT_R_ARM, DIRECTION_R_ARM, GEARSET_ARMS, ENCODER_UNIT_ARMS);
+Motor motorElevator = Motor(PORT_BASE_GRIPPER, DIRECTION_BASE_GRIPPER, GEARSET_BASE_GRIPPER, ENCODER_UNIT_BASE_GRIPPER);
+std::shared_ptr<ChassisController> drive;
 
 /**
  * Runs initialization code. This occurs as soon as the program is started.
@@ -49,7 +71,13 @@ using namespace base_functions;
 void initialize()
 {
 	pros::lcd::initialize();
-	pros::lcd::set_text(1, "Test Robot");
+	motorElevator.setBrakeMode(AbstractMotor::brakeMode::hold);
+	const MotorGroup leftMotors = {motorBL, motorFL};
+	const MotorGroup rightMotors = {motorBR, motorFR};
+	drive = ChassisControllerBuilder()
+				.withMotors(leftMotors, rightMotors)
+				.withDimensions(GEARSET_WHEELS, {{WHEEL_DIAMETER, WHEEL_TRACK}, imev5GreenTPR})
+				.build();
 }
 
 /**
@@ -99,76 +127,71 @@ void autonomous() {}
 
 void opcontrol()
 {
+	bool execute = true;
+	bool pneumatic_activated = false;
+	bool pneumatic_debounce = false;
+	bool ringmill_activated = false;
+	bool ringmill_debounce = false;
 
-	Motor motorFL = Motor(PORT_FL_WHEEL, DIRECTION_FL_WHEEL, GEARSET_WHEELS, ENCODER_UNIT_WHEELS);
-	Motor motorFR = Motor(PORT_FR_WHEEL, DIRECTION_FR_WHEEL, GEARSET_WHEELS, ENCODER_UNIT_WHEELS);
-	Motor motorBL = Motor(PORT_BL_WHEEL, DIRECTION_BL_WHEEL, GEARSET_WHEELS, ENCODER_UNIT_WHEELS);
-	Motor motorBR = Motor(PORT_BR_WHEEL, DIRECTION_BR_WHEEL, GEARSET_WHEELS, ENCODER_UNIT_WHEELS);
-
-	const MotorGroup leftMotors = {motorBL, motorFL};
-	const MotorGroup rightMotors = {motorBR, motorFR};
-
-	std::shared_ptr<ChassisController> drive =
-		ChassisControllerBuilder().withMotors(leftMotors, rightMotors).withDimensions(GEARSET_WHEELS, {{WHEEL_DIAMETER, WHEEL_TRACK}, imev5GreenTPR}).build();
-
-	std::shared_ptr<Motor> ringMillMotor(new Motor(PORT_RING_MILL, DIRECTION_RING_MILL, GEARSET_RING_MILL, ENCODER_UNIT_RING_MILL));
-	std::shared_ptr<pros::ADIPort> pneumatic(new pros::ADIPort(PORT_PNEUMATICS, ADI_DIGITAL_OUT));
-
-	Controller controller;
-	float speedLeftX, speedLeftY, speedRightX, speedRightY;
-	bool r1_pressed;
-	bool r2_pressed;
-	bool x_pressed;
-	bool y_pressed;
-
-	ControllerButton x = ControllerButton(ControllerDigital::X);
-
-	IMU gyroscope(PORT_GYROSCOPE);
-
-	RotationSensor armRotation(PORT_ARM_ROTATION);
-	Motor motorArmLeft = Motor(PORT_L_ARM, DIRECTION_L_ARM, GEARSET_ARMS, ENCODER_UNIT_ARMS);
-	Motor motorArmRight = Motor(PORT_R_ARM, DIRECTION_R_ARM, GEARSET_ARMS, ENCODER_UNIT_ARMS);
-
-	gyroscope.reset();
-	armRotation.reset();
-
-
-	while (true)
+	while (execute)
 	{
-
-
-		pros::lcd::print(1, "Arm Angle: %d", armRotation.get());
-
-		speedLeftY = controller.getAnalog(ControllerAnalog::leftY);
-		speedLeftX = controller.getAnalog(ControllerAnalog::leftX);
-		speedRightY = controller.getAnalog(ControllerAnalog::rightY);
-		speedRightX = controller.getAnalog(ControllerAnalog::rightX);
-		r1_pressed = controller.getDigital(ControllerDigital::R1);
-		r2_pressed = controller.getDigital(ControllerDigital::R2);
-		x_pressed = controller.getDigital(ControllerDigital::X);
-		y_pressed = controller.getDigital(ControllerDigital::Y);
-
-
-		// Ring mill
-		base_functions::activate_ring_mill(ringMillMotor, x_pressed);
-
-
-		// Pneumatic
-		base_functions::activate_pneumatic(pneumatic, y_pressed);
-
-		if (r1_pressed)
+		if (controller.getDigital(ControllerDigital::R1))
 		{
-
 			motorArmRight.moveRelative(1.0, 100);
 			motorArmLeft.moveRelative(1.0, 100);
 		}
-		else if (r2_pressed)
+		if (controller.getDigital(ControllerDigital::R2))
 		{
 			motorArmRight.moveRelative(-1.0, 100);
 			motorArmLeft.moveRelative(-1.0, 100);
 		}
+		if (controller.getDigital(ControllerDigital::L2))
+		{
+			motorElevator.moveRelative(30 * GEAR_RATIO_BASE_GRIPPER, 30);
+		}
+		if (controller.getDigital(ControllerDigital::L1))
+		{
+			motorElevator.moveRelative(-30 * GEAR_RATIO_BASE_GRIPPER, 30);
+		}
+		if (controller.getDigital(ControllerDigital::A))
+		{
+			execute = false;
+		}
+		if (controller.getDigital(ControllerDigital::Y))
+		{
+			if (!pneumatic_debounce) {
+				pneumatic_activated = !pneumatic_activated;
+				pneumatic_debounce = true;
+			}
+		} else {
+			pneumatic_debounce = false;
+		}
+		if (controller.getDigital(ControllerDigital::X))
+		{
+			if (!ringmill_debounce) {
+				ringmill_activated = !ringmill_activated;
+				ringmill_debounce = true;
+			}
+		} else {
+			ringmill_debounce = false;
+		}
 
-		drive->getModel()->arcade(speedLeftY, speedLeftX);
+		if (pneumatic_activated) {
+			pneumatic.set_value(1);
+		} else {
+			pneumatic.set_value(0);
+		}
+
+		if (ringmill_activated) {
+			ringMillMotor.moveVelocity(MAX_VELOCITY_RING_MILL);
+		} else {
+			ringMillMotor.moveVelocity(0);
+		}
+
+		drive->getModel()->arcade(
+			controller.getAnalog(ControllerAnalog::leftY),
+			controller.getAnalog(ControllerAnalog::leftX));
+
+		pros::delay(20);
 	}
-
 }
