@@ -27,7 +27,7 @@ using namespace okapi;
 
 // Arm specifications
 #define GEARSET_ARMS AbstractMotor::gearset::red
-#define ENCODER_UNIT_ARMS AbstractMotor::encoderUnits::rotations
+#define ENCODER_UNIT_ARMS AbstractMotor::encoderUnits::degrees
 #define DIRECTION_R_ARM false
 #define DIRECTION_L_ARM true
 
@@ -37,9 +37,10 @@ using namespace okapi;
 #define DIRECTION_RING_MILL false
 
 // Base Gripper specification
-#define DIRECTION_BASE_GRIPPER false
+#define DIRECTION_BASE_GRIPPER true
 #define GEARSET_BASE_GRIPPER AbstractMotor::gearset::green
-#define ENCODER_UNIT_BASE_GRIPPER AbstractMotor::encoderUnits::rotations
+#define ENCODER_UNIT_BASE_GRIPPER AbstractMotor::encoderUnits::degrees
+#define GEAR_RATIO_BASE_GRIPPER 5
 
 // Proportions
 #define WHEEL_DIAMETER 11_cm
@@ -69,6 +70,7 @@ Motor motorElevator = Motor(PORT_BASE_GRIPPER, DIRECTION_BASE_GRIPPER, GEARSET_B
 void initialize()
 {
 	pros::lcd::initialize();
+	motorElevator.setBrakeMode(AbstractMotor::brakeMode::hold);
 }
 
 /**
@@ -127,24 +129,8 @@ void opcontrol()
 			.withDimensions(GEARSET_WHEELS, {{WHEEL_DIAMETER, WHEEL_TRACK}, imev5GreenTPR})
 			.build();
 
-	IterativeVelPIDController::Gains gains{
-		kP : 0.5,
-		kD : 0,
-		kF : 0,
-		kSF : 0
-	};
-
-	float speedLeftX, speedLeftY;
-	const auto controllerPID = AsyncVelControllerBuilder()
-								   .withMotor(motorElevator)
-								   .withGains(gains)
-								   .withVelMath(VelMathFactory::createPtr(imev5GreenTPR, 10_ms))
-								   .build();
-
 	while (!controller.getDigital(ControllerDigital::A))
 	{
-		controller.setText(2, 0, std::to_string(motorElevator.getPosition()));
-
 		if (controller.getDigital(ControllerDigital::R1))
 		{
 			motorArmRight.moveRelative(1.0, 100);
@@ -155,13 +141,13 @@ void opcontrol()
 			motorArmRight.moveRelative(-1.0, 100);
 			motorArmLeft.moveRelative(-1.0, 100);
 		}
-		else if (controller.getDigital(ControllerDigital::L2) && (motorElevator.getPosition()) > -1.5)
+		else if (controller.getDigital(ControllerDigital::L2))
 		{
-			motorElevator.moveAbsolute(-1.55, 150);
+			motorElevator.moveRelative(30*GEAR_RATIO_BASE_GRIPPER, 30);
 		}
-		else if (controller.getDigital(ControllerDigital::L1) && (motorElevator.getPosition()) < 0.1)
+		else if (controller.getDigital(ControllerDigital::L1))
 		{
-			motorElevator.moveRelative(0.5, 200);
+			motorElevator.moveRelative(-30*GEAR_RATIO_BASE_GRIPPER, 30);
 		}
 
 		drive->getModel()->arcade(
@@ -170,6 +156,4 @@ void opcontrol()
 
 		pros::delay(20);
 	}
-
-	motorElevator.moveAbsolute(0.0, 50);
 }
