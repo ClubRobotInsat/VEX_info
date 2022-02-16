@@ -29,6 +29,12 @@ using namespace okapi;
 #define ENCODER_UNIT_ARMS AbstractMotor::encoderUnits::degrees
 #define DIRECTION_R_ARM false
 #define DIRECTION_L_ARM true
+#define ARM_GEAR_RATIO 6.95
+#define ARM_LOW_TO_MIDDLE_POSITION_ROTATION -60
+#define ARM_MIDDLE_TO_LOW_POSITION_ROTATION 60
+#define ARM_MIDDLE_TO_HIGH_POSITION_ROTATION -2
+#define ARM_HIGH_TO_MIDDLE_POSITION_ROTATION 2
+
 
 // Ring Mill specification
 #define GEARSET_RING_MILL AbstractMotor::gearset::green
@@ -46,6 +52,9 @@ using namespace okapi;
 #define WHEEL_DIAMETER 11_cm
 #define WHEEL_TRACK 43_cm
 
+// Enum Arm positions
+enum POSITIONS{DOWN,MIDDLE,UP};
+
 // Global variables - sensors and actuators
 
 Controller controller;
@@ -61,6 +70,7 @@ Motor motorArmLeft = Motor(PORT_L_ARM, DIRECTION_L_ARM, GEARSET_ARMS, ENCODER_UN
 Motor motorArmRight = Motor(PORT_R_ARM, DIRECTION_R_ARM, GEARSET_ARMS, ENCODER_UNIT_ARMS);
 Motor motorElevator = Motor(PORT_BASE_GRIPPER, DIRECTION_BASE_GRIPPER, GEARSET_BASE_GRIPPER, ENCODER_UNIT_BASE_GRIPPER);
 std::shared_ptr<ChassisController> drive;
+ADIButton armBumper = ADIButton('E');
 
 /**
  * Runs initialization code. This occurs as soon as the program is started.
@@ -132,18 +142,54 @@ void opcontrol()
 	bool pneumatic_debounce = false;
 	bool ringmill_activated = false;
 	bool ringmill_debounce = false;
-
+	POSITIONS arm_position = MIDDLE;
+	POSITIONS elevator_position = UP;
+	bool not_pressed = true;
 	while (execute)
 	{
+		// TODO Add gear ratios for the relative move
 		if (controller.getDigital(ControllerDigital::R1))
 		{
-			motorArmRight.moveRelative(1.0, 100);
-			motorArmLeft.moveRelative(1.0, 100);
+			if(arm_position == MIDDLE){
+				motorArmRight.moveRelative(-20 * ARM_GEAR_RATIO, 50);
+				motorArmLeft.moveRelative(-20 * ARM_GEAR_RATIO, 50);
+				arm_position = UP;
+			} else if(arm_position == DOWN) {
+				// rise to middle
+				motorArmRight.moveRelative(-55 * ARM_GEAR_RATIO, 50);
+				motorArmLeft.moveRelative(-55 * ARM_GEAR_RATIO, 50);
+				arm_position = MIDDLE;
+			}
 		}
 		if (controller.getDigital(ControllerDigital::R2))
 		{
-			motorArmRight.moveRelative(-1.0, 100);
-			motorArmLeft.moveRelative(-1.0, 100);
+			if(arm_position == UP){
+				// lower to middle
+				motorArmRight.moveRelative(20 * ARM_GEAR_RATIO, 50);
+				motorArmLeft.moveRelative(20 * ARM_GEAR_RATIO, 50);
+				arm_position = MIDDLE;
+			} else if(arm_position == MIDDLE) {
+				// lower to bottom
+				motorArmRight.moveRelative(55 * ARM_GEAR_RATIO, 50);
+				motorArmLeft.moveRelative(55 * ARM_GEAR_RATIO, 50);
+				arm_position = DOWN;
+			}
+		}
+		// Press B to calibrate
+		if(controller.getDigital(ControllerDigital::B)){
+			motorArmLeft.moveVelocity(50);
+			motorArmRight.moveVelocity(50);
+			while(not_pressed){
+				if(armBumper.isPressed()){
+					not_pressed = false;
+				}
+				controller.setText(2,0,"touched");
+			}
+			motorArmLeft.moveRelative(-50,50);
+			motorArmRight.moveRelative(-50,50);
+			motorArmLeft.tarePosition();
+			motorArmRight.tarePosition();
+			arm_position = DOWN;
 		}
 		if (controller.getDigital(ControllerDigital::L2))
 		{
