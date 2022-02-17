@@ -15,6 +15,8 @@ using namespace okapi;
 #define PORT_RING_MILL 8
 #define PORT_BASE_GRIPPER 11
 #define PORT_PNEUMATICS 'A'
+#define PORT_ARM_BUMPER 'E'
+#define PORT_BASE_GRIPPER_BUMPER 'F'
 
 // Wheels specifications
 #define DIRECTION_FL_WHEEL false
@@ -30,11 +32,9 @@ using namespace okapi;
 #define DIRECTION_R_ARM false
 #define DIRECTION_L_ARM true
 #define ARM_GEAR_RATIO 6.95
-#define ARM_LOW_TO_MIDDLE_POSITION_ROTATION -60
-#define ARM_MIDDLE_TO_LOW_POSITION_ROTATION 60
-#define ARM_MIDDLE_TO_HIGH_POSITION_ROTATION -2
-#define ARM_HIGH_TO_MIDDLE_POSITION_ROTATION 2
-
+#define ARM_POSITION_LOW -55
+#define ARM_POSITION_DRIVE -20
+#define ARM_POSITION_HIGH 20
 
 // Ring Mill specification
 #define GEARSET_RING_MILL AbstractMotor::gearset::green
@@ -47,13 +47,13 @@ using namespace okapi;
 #define GEARSET_BASE_GRIPPER AbstractMotor::gearset::green
 #define ENCODER_UNIT_BASE_GRIPPER AbstractMotor::encoderUnits::degrees
 #define GEAR_RATIO_BASE_GRIPPER 5
+#define BASE_GRIPPER_POSITION_LOW -55
+#define BASE_GRIPPER_POSITION_DRIVE -20
+#define BASE_GRIPPER_POSITION_HIGH 20
 
 // Proportions
 #define WHEEL_DIAMETER 11_cm
 #define WHEEL_TRACK 43_cm
-
-// Enum Arm positions
-enum POSITIONS{DOWN,MIDDLE,UP};
 
 // Global variables - sensors and actuators
 
@@ -68,9 +68,10 @@ IMU gyroscope = IMU(PORT_GYROSCOPE);
 RotationSensor armRotation = RotationSensor(PORT_ARM_ROTATION);
 Motor motorArmLeft = Motor(PORT_L_ARM, DIRECTION_L_ARM, GEARSET_ARMS, ENCODER_UNIT_ARMS);
 Motor motorArmRight = Motor(PORT_R_ARM, DIRECTION_R_ARM, GEARSET_ARMS, ENCODER_UNIT_ARMS);
-Motor motorElevator = Motor(PORT_BASE_GRIPPER, DIRECTION_BASE_GRIPPER, GEARSET_BASE_GRIPPER, ENCODER_UNIT_BASE_GRIPPER);
+Motor motorBaseGripper = Motor(PORT_BASE_GRIPPER, DIRECTION_BASE_GRIPPER, GEARSET_BASE_GRIPPER, ENCODER_UNIT_BASE_GRIPPER);
 std::shared_ptr<ChassisController> drive;
-ADIButton armBumper = ADIButton('E');
+ADIButton armBumper = ADIButton(PORT_ARM_BUMPER);
+ADIButton baseGripperBumper = ADIButton(PORT_BASE_GRIPPER_BUMPER);
 
 /**
  * Runs initialization code. This occurs as soon as the program is started.
@@ -81,7 +82,7 @@ ADIButton armBumper = ADIButton('E');
 void initialize()
 {
 	pros::lcd::initialize();
-	motorElevator.setBrakeMode(AbstractMotor::brakeMode::hold);
+	motorBaseGripper.setBrakeMode(AbstractMotor::brakeMode::hold);
 	const MotorGroup leftMotors = {motorBL, motorFL};
 	const MotorGroup rightMotors = {motorBR, motorFR};
 	drive = ChassisControllerBuilder()
@@ -142,62 +143,53 @@ void opcontrol()
 	bool pneumatic_debounce = false;
 	bool ringmill_activated = false;
 	bool ringmill_debounce = false;
-	POSITIONS arm_position = MIDDLE;
-	POSITIONS elevator_position = UP;
+	int arm_position = 0;
+	int base_gripper_position = 2;
 	bool not_pressed = true;
+	bool test_pressed = true;
+
 	while (execute)
 	{
-		// TODO Add gear ratios for the relative move
+		if (!baseGripperBumper.isPressed())
+		{
+			pros::lcd::print(2, "Button not pressed ");
+			pros::delay(200);
+		}
+		else
+		{
+			pros::lcd::print(2, "Button pressed");
+			pros::delay(200);
+		}
 		if (controller.getDigital(ControllerDigital::R1))
 		{
-			if(arm_position == MIDDLE){
-				motorArmRight.moveRelative(-20 * ARM_GEAR_RATIO, 50);
-				motorArmLeft.moveRelative(-20 * ARM_GEAR_RATIO, 50);
-				arm_position = UP;
-			} else if(arm_position == DOWN) {
-				// rise to middle
-				motorArmRight.moveRelative(-55 * ARM_GEAR_RATIO, 50);
-				motorArmLeft.moveRelative(-55 * ARM_GEAR_RATIO, 50);
-				arm_position = MIDDLE;
+			if (arm_position < 2)
+			{
+				arm_position++;
 			}
 		}
 		if (controller.getDigital(ControllerDigital::R2))
 		{
-			if(arm_position == UP){
-				// lower to middle
-				motorArmRight.moveRelative(20 * ARM_GEAR_RATIO, 50);
-				motorArmLeft.moveRelative(20 * ARM_GEAR_RATIO, 50);
-				arm_position = MIDDLE;
-			} else if(arm_position == MIDDLE) {
-				// lower to bottom
-				motorArmRight.moveRelative(55 * ARM_GEAR_RATIO, 50);
-				motorArmLeft.moveRelative(55 * ARM_GEAR_RATIO, 50);
-				arm_position = DOWN;
+			if (arm_position > 0)
+			{
+				arm_position--;
 			}
 		}
-		// Press B to calibrate
-		if(controller.getDigital(ControllerDigital::B)){
-			motorArmLeft.moveVelocity(50);
-			motorArmRight.moveVelocity(50);
-			while(not_pressed){
-				if(armBumper.isPressed()){
-					not_pressed = false;
-				}
-				controller.setText(2,0,"touched");
-			}
-			motorArmLeft.moveRelative(-50,50);
-			motorArmRight.moveRelative(-50,50);
-			motorArmLeft.tarePosition();
-			motorArmRight.tarePosition();
-			arm_position = DOWN;
+		if (controller.getDigital(ControllerDigital::B))
+		{
 		}
 		if (controller.getDigital(ControllerDigital::L2))
 		{
-			motorElevator.moveRelative(30 * GEAR_RATIO_BASE_GRIPPER, 30);
+			if (base_gripper_position > 0)
+			{
+				base_gripper_position--;
+			}
 		}
 		if (controller.getDigital(ControllerDigital::L1))
 		{
-			motorElevator.moveRelative(-30 * GEAR_RATIO_BASE_GRIPPER, 30);
+			if (base_gripper_position < 2)
+			{
+				base_gripper_position++;
+			}
 		}
 		if (controller.getDigital(ControllerDigital::A))
 		{
@@ -205,33 +197,60 @@ void opcontrol()
 		}
 		if (controller.getDigital(ControllerDigital::Y))
 		{
-			if (!pneumatic_debounce) {
+			if (!pneumatic_debounce)
+			{
 				pneumatic_activated = !pneumatic_activated;
 				pneumatic_debounce = true;
 			}
-		} else {
+		}
+		else
+		{
 			pneumatic_debounce = false;
 		}
 		if (controller.getDigital(ControllerDigital::X))
 		{
-			if (!ringmill_debounce) {
+			if (!ringmill_debounce)
+			{
 				ringmill_activated = !ringmill_activated;
 				ringmill_debounce = true;
 			}
-		} else {
+		}
+		else
+		{
 			ringmill_debounce = false;
 		}
 
-		if (pneumatic_activated) {
+		if (pneumatic_activated)
+		{
 			pneumatic.set_value(1);
-		} else {
+		}
+		else
+		{
 			pneumatic.set_value(0);
 		}
 
-		if (ringmill_activated) {
+		if (ringmill_activated)
+		{
 			ringMillMotor.moveVelocity(MAX_VELOCITY_RING_MILL);
-		} else {
+		}
+		else
+		{
 			ringMillMotor.moveVelocity(0);
+		}
+		if (arm_position == 0)
+		{
+			motorArmLeft.moveAbsolute(ARM_POSITION_LOW, 50);
+			motorArmRight.moveAbsolute(ARM_POSITION_LOW, 50);
+		}
+		else if (arm_position == 1)
+		{
+			motorArmLeft.moveAbsolute(ARM_POSITION_DRIVE, 50);
+			motorArmRight.moveAbsolute(ARM_POSITION_DRIVE, 50);
+		}
+		else if (arm_position == 2)
+		{
+			motorArmLeft.moveAbsolute(ARM_POSITION_HIGH, 50);
+			motorArmRight.moveAbsolute(ARM_POSITION_HIGH, 50);
 		}
 
 		drive->getModel()->arcade(
