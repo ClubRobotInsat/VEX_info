@@ -19,37 +19,36 @@ using namespace okapi;
 #define PORT_BASE_GRIPPER_BUMPER 'F'
 
 // Wheels specifications
-#define DIRECTION_FL_WHEEL false
-#define DIRECTION_FR_WHEEL true
-#define DIRECTION_BL_WHEEL true
-#define DIRECTION_BR_WHEEL false
-#define GEARSET_WHEELS AbstractMotor::gearset::green
-#define ENCODER_UNIT_WHEELS AbstractMotor::encoderUnits::rotations
+#define WHEEL_DIRECTION_FL false
+#define WHEEL_DIRECTION_FR true
+#define WHEEL_DIRECTION_BL true
+#define WHEEL_DIRECTION_BR false
+#define WHEEL_GEARSET AbstractMotor::gearset::green
+#define WHEEL_ENCODER_UNIT AbstractMotor::encoderUnits::rotations
 
 // Arm specifications
-#define GEARSET_ARMS AbstractMotor::gearset::red
-#define ENCODER_UNIT_ARMS AbstractMotor::encoderUnits::degrees
-#define DIRECTION_R_ARM false
-#define DIRECTION_L_ARM true
+#define ARM_GEARSET AbstractMotor::gearset::red
+#define ARM_ENCODER_UNIT AbstractMotor::encoderUnits::degrees
+#define ARM_DIRECTION_R false
+#define ARM_DIRECTION_L true
 #define ARM_GEAR_RATIO 6.95
 #define ARM_POSITION_LOW -55
 #define ARM_POSITION_DRIVE -20
 #define ARM_POSITION_HIGH 20
 
 // Ring Mill specification
-#define GEARSET_RING_MILL AbstractMotor::gearset::green
-#define ENCODER_UNIT_RING_MILL AbstractMotor::encoderUnits::rotations
-#define DIRECTION_RING_MILL false
-#define MAX_VELOCITY_RING_MILL 200
+#define RING_MILL_GEARSET AbstractMotor::gearset::green
+#define RING_MILL_ENCODER_UNIT AbstractMotor::encoderUnits::rotations
+#define RING_MILL_DIRECTION false
+#define RING_MILL_MAX_VELOCITY 200
 
 // Base Gripper specification
-#define DIRECTION_BASE_GRIPPER true
-#define GEARSET_BASE_GRIPPER AbstractMotor::gearset::green
-#define ENCODER_UNIT_BASE_GRIPPER AbstractMotor::encoderUnits::degrees
-#define GEAR_RATIO_BASE_GRIPPER 5
-#define BASE_GRIPPER_POSITION_LOW -55
-#define BASE_GRIPPER_POSITION_DRIVE -20
-#define BASE_GRIPPER_POSITION_HIGH 20
+#define BASE_GRIPPER_DIRECTION true
+#define BASE_GRIPPER_GEARSET AbstractMotor::gearset::green
+#define BASE_GRIPPER_ENCODER_UNIT AbstractMotor::encoderUnits::degrees
+#define BASEGRIPPERPOSITION_LOW -55
+#define BASEGRIPPERPOSITION_DRIVE -20
+#define BASEGRIPPERPOSITION_HIGH 20
 
 // Proportions
 #define WHEEL_DIAMETER 11_cm
@@ -58,17 +57,17 @@ using namespace okapi;
 // Global variables - sensors and actuators
 
 Controller controller;
-Motor motorFL = Motor(PORT_FL_WHEEL, DIRECTION_FL_WHEEL, GEARSET_WHEELS, ENCODER_UNIT_WHEELS);
-Motor motorFR = Motor(PORT_FR_WHEEL, DIRECTION_FR_WHEEL, GEARSET_WHEELS, ENCODER_UNIT_WHEELS);
-Motor motorBL = Motor(PORT_BL_WHEEL, DIRECTION_BL_WHEEL, GEARSET_WHEELS, ENCODER_UNIT_WHEELS);
-Motor motorBR = Motor(PORT_BR_WHEEL, DIRECTION_BR_WHEEL, GEARSET_WHEELS, ENCODER_UNIT_WHEELS);
-Motor ringMillMotor = Motor(PORT_RING_MILL, DIRECTION_RING_MILL, GEARSET_RING_MILL, ENCODER_UNIT_RING_MILL);
+Motor motorFL = Motor(PORT_FL_WHEEL, WHEEL_DIRECTION_FL, WHEEL_GEARSET, WHEEL_ENCODER_UNIT);
+Motor motorFR = Motor(PORT_FR_WHEEL, WHEEL_DIRECTION_FR, WHEEL_GEARSET, WHEEL_ENCODER_UNIT);
+Motor motorBL = Motor(PORT_BL_WHEEL, WHEEL_DIRECTION_BL, WHEEL_GEARSET, WHEEL_ENCODER_UNIT);
+Motor motorBR = Motor(PORT_BR_WHEEL, WHEEL_DIRECTION_BR, WHEEL_GEARSET, WHEEL_ENCODER_UNIT);
+Motor ringMillMotor = Motor(PORT_RING_MILL, RING_MILL_DIRECTION, RING_MILL_GEARSET, RING_MILL_ENCODER_UNIT);
 pros::ADIPort pneumatic = pros::ADIPort(PORT_PNEUMATICS, ADI_DIGITAL_OUT);
 IMU gyroscope = IMU(PORT_GYROSCOPE);
 RotationSensor armRotation = RotationSensor(PORT_ARM_ROTATION);
-Motor motorArmLeft = Motor(PORT_L_ARM, DIRECTION_L_ARM, GEARSET_ARMS, ENCODER_UNIT_ARMS);
-Motor motorArmRight = Motor(PORT_R_ARM, DIRECTION_R_ARM, GEARSET_ARMS, ENCODER_UNIT_ARMS);
-Motor motorBaseGripper = Motor(PORT_BASE_GRIPPER, DIRECTION_BASE_GRIPPER, GEARSET_BASE_GRIPPER, ENCODER_UNIT_BASE_GRIPPER);
+Motor motorArmLeft = Motor(PORT_L_ARM, ARM_DIRECTION_L, ARM_GEARSET, ARM_ENCODER_UNIT);
+Motor motorArmRight = Motor(PORT_R_ARM, ARM_DIRECTION_R, ARM_GEARSET, ARM_ENCODER_UNIT);
+Motor motorBaseGripper = Motor(PORT_BASE_GRIPPER, BASE_GRIPPER_DIRECTION, BASE_GRIPPER_GEARSET, BASE_GRIPPER_ENCODER_UNIT);
 std::shared_ptr<ChassisController> drive;
 ADIButton armBumper = ADIButton(PORT_ARM_BUMPER);
 ADIButton baseGripperBumper = ADIButton(PORT_BASE_GRIPPER_BUMPER);
@@ -87,7 +86,7 @@ void initialize()
 	const MotorGroup rightMotors = {motorBR, motorFR};
 	drive = ChassisControllerBuilder()
 				.withMotors(leftMotors, rightMotors)
-				.withDimensions(GEARSET_WHEELS, {{WHEEL_DIAMETER, WHEEL_TRACK}, imev5GreenTPR})
+				.withDimensions(WHEEL_GEARSET, {{WHEEL_DIAMETER, WHEEL_TRACK}, imev5GreenTPR})
 				.build();
 }
 
@@ -139,56 +138,49 @@ void autonomous() {}
 void opcontrol()
 {
 	bool execute = true;
-	bool pneumatic_activated = false;
-	bool pneumatic_debounce = false;
-	bool ringmill_activated = false;
-	bool ringmill_debounce = false;
-	int arm_position = 0;
-	int base_gripper_position = 2;
-	bool not_pressed = true;
-	bool test_pressed = true;
+	bool pneumaticActivated = false;
+	bool pneumaticDebounce = false;
+	bool ringMillActivated = false;
+	bool ringMillDebounce = false;
+	int armPosition = 0;
+	int baseGripperPosition = 2;
 
 	while (execute)
 	{
 		if (!baseGripperBumper.isPressed())
 		{
 			pros::lcd::print(2, "Button not pressed ");
-			pros::delay(200);
 		}
 		else
 		{
 			pros::lcd::print(2, "Button pressed");
-			pros::delay(200);
 		}
 		if (controller.getDigital(ControllerDigital::R1))
 		{
-			if (arm_position < 2)
+			if (armPosition < 2)
 			{
-				arm_position++;
+				armPosition++;
 			}
 		}
 		if (controller.getDigital(ControllerDigital::R2))
 		{
-			if (arm_position > 0)
+			if (armPosition > 0)
 			{
-				arm_position--;
+				armPosition--;
 			}
-		}
-		if (controller.getDigital(ControllerDigital::B))
-		{
 		}
 		if (controller.getDigital(ControllerDigital::L2))
 		{
-			if (base_gripper_position > 0)
+			if (baseGripperPosition > 0)
 			{
-				base_gripper_position--;
+				baseGripperPosition--;
 			}
 		}
 		if (controller.getDigital(ControllerDigital::L1))
 		{
-			if (base_gripper_position < 2)
+			if (baseGripperPosition < 2)
 			{
-				base_gripper_position++;
+				baseGripperPosition++;
 			}
 		}
 		if (controller.getDigital(ControllerDigital::A))
@@ -197,30 +189,30 @@ void opcontrol()
 		}
 		if (controller.getDigital(ControllerDigital::Y))
 		{
-			if (!pneumatic_debounce)
+			if (!pneumaticDebounce)
 			{
-				pneumatic_activated = !pneumatic_activated;
-				pneumatic_debounce = true;
+				pneumaticActivated = !pneumaticActivated;
+				pneumaticDebounce = true;
 			}
 		}
 		else
 		{
-			pneumatic_debounce = false;
+			pneumaticDebounce = false;
 		}
 		if (controller.getDigital(ControllerDigital::X))
 		{
-			if (!ringmill_debounce)
+			if (!ringMillDebounce)
 			{
-				ringmill_activated = !ringmill_activated;
-				ringmill_debounce = true;
+				ringMillActivated = !ringMillActivated;
+				ringMillDebounce = true;
 			}
 		}
 		else
 		{
-			ringmill_debounce = false;
+			ringMillDebounce = false;
 		}
 
-		if (pneumatic_activated)
+		if (pneumaticActivated)
 		{
 			pneumatic.set_value(1);
 		}
@@ -229,25 +221,25 @@ void opcontrol()
 			pneumatic.set_value(0);
 		}
 
-		if (ringmill_activated)
+		if (ringMillActivated)
 		{
-			ringMillMotor.moveVelocity(MAX_VELOCITY_RING_MILL);
+			ringMillMotor.moveVelocity(RING_MILL_MAX_VELOCITY);
 		}
 		else
 		{
 			ringMillMotor.moveVelocity(0);
 		}
-		if (arm_position == 0)
+		if (armPosition == 0)
 		{
 			motorArmLeft.moveAbsolute(ARM_POSITION_LOW, 50);
 			motorArmRight.moveAbsolute(ARM_POSITION_LOW, 50);
 		}
-		else if (arm_position == 1)
+		else if (armPosition == 1)
 		{
 			motorArmLeft.moveAbsolute(ARM_POSITION_DRIVE, 50);
 			motorArmRight.moveAbsolute(ARM_POSITION_DRIVE, 50);
 		}
-		else if (arm_position == 2)
+		else if (armPosition == 2)
 		{
 			motorArmLeft.moveAbsolute(ARM_POSITION_HIGH, 50);
 			motorArmRight.moveAbsolute(ARM_POSITION_HIGH, 50);
