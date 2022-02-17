@@ -15,8 +15,8 @@ using namespace okapi;
 #define PORT_RING_MILL 8
 #define PORT_BASE_GRIPPER 11
 #define PORT_PNEUMATICS 'A'
+#define PORT_BASE_GRIPPER_BUMPER 'B'
 #define PORT_ARM_BUMPER 'E'
-#define PORT_BASE_GRIPPER_BUMPER 'F'
 
 // Wheels specifications
 #define WHEEL_DIRECTION_FL false
@@ -32,9 +32,9 @@ using namespace okapi;
 #define ARM_DIRECTION_R false
 #define ARM_DIRECTION_L true
 #define ARM_GEAR_RATIO 6.95
-#define ARM_POSITION_LOW -55
-#define ARM_POSITION_DRIVE -20
-#define ARM_POSITION_HIGH 20
+#define ARM_POSITION_LOW 0
+#define ARM_POSITION_DRIVE -200
+#define ARM_POSITION_HIGH -500
 
 // Ring Mill specification
 #define RING_MILL_GEARSET AbstractMotor::gearset::green
@@ -46,9 +46,9 @@ using namespace okapi;
 #define BASE_GRIPPER_DIRECTION true
 #define BASE_GRIPPER_GEARSET AbstractMotor::gearset::green
 #define BASE_GRIPPER_ENCODER_UNIT AbstractMotor::encoderUnits::degrees
-#define BASEGRIPPERPOSITION_LOW -55
-#define BASEGRIPPERPOSITION_DRIVE -20
-#define BASEGRIPPERPOSITION_HIGH 20
+#define BASE_GRIPPER_POSITION_LOW 0
+#define BASE_GRIPPER_POSITION_DRIVE 50
+#define BASE_GRIPPER_POSITION_HIGH 100
 
 // Proportions
 #define WHEEL_DIAMETER 11_cm
@@ -70,7 +70,7 @@ Motor motorArmRight = Motor(PORT_R_ARM, ARM_DIRECTION_R, ARM_GEARSET, ARM_ENCODE
 Motor motorBaseGripper = Motor(PORT_BASE_GRIPPER, BASE_GRIPPER_DIRECTION, BASE_GRIPPER_GEARSET, BASE_GRIPPER_ENCODER_UNIT);
 std::shared_ptr<ChassisController> drive;
 ADIButton armBumper = ADIButton(PORT_ARM_BUMPER);
-ADIButton baseGripperBumper = ADIButton(PORT_BASE_GRIPPER_BUMPER);
+ADIButton baseGripperEndstop = ADIButton(PORT_BASE_GRIPPER_BUMPER, true);
 
 /**
  * Runs initialization code. This occurs as soon as the program is started.
@@ -88,6 +88,25 @@ void initialize()
 				.withMotors(leftMotors, rightMotors)
 				.withDimensions(WHEEL_GEARSET, {{WHEEL_DIAMETER, WHEEL_TRACK}, imev5GreenTPR})
 				.build();
+
+	motorArmLeft.moveRelative(-100, 100);
+	motorArmRight.moveRelative(-100, 100);
+	pros::delay(400);
+	while (!baseGripperEndstop.isPressed())
+	{
+		motorArmLeft.moveRelative(20, 100);
+		motorArmRight.moveRelative(20, 100);
+	}
+	motorArmLeft.moveRelative(-20, 50);
+	motorArmRight.moveRelative(-20, 50);
+	pros::delay(400);
+	while (!baseGripperEndstop.isPressed())
+	{
+		motorArmLeft.moveRelative(1, 50);
+		motorArmRight.moveRelative(1, 50);
+	}
+	motorArmLeft.tarePosition();
+	motorArmRight.tarePosition();
 }
 
 /**
@@ -139,34 +158,45 @@ void opcontrol()
 {
 	bool execute = true;
 	bool pneumaticActivated = false;
-	bool pneumaticDebounce = false;
 	bool ringMillActivated = false;
-	bool ringMillDebounce = false;
+	bool debounceY = false;
+	bool debounceX = false;
+	bool debounceR1 = false;
+	bool debounceR2 = false;
 	int armPosition = 0;
 	int baseGripperPosition = 2;
 
 	while (execute)
 	{
-		if (!baseGripperBumper.isPressed())
+		if (controller.getDigital(ControllerDigital::R1))
 		{
-			pros::lcd::print(2, "Button not pressed ");
+			if (armPosition < 2 && !debounceR1)
+			{
+				armPosition++;
+				debounceR1 = true;
+			}
 		}
 		else
 		{
-			pros::lcd::print(2, "Button pressed");
-		}
-		if (controller.getDigital(ControllerDigital::R1))
-		{
-			if (armPosition < 2)
-			{
-				armPosition++;
-			}
+			debounceR1 = false;
 		}
 		if (controller.getDigital(ControllerDigital::R2))
 		{
-			if (armPosition > 0)
+			if (armPosition > 0  && !debounceR2)
 			{
 				armPosition--;
+				debounceR2 = true;
+			}
+		}
+		else
+		{
+			debounceR2 = false;
+		}
+		if (controller.getDigital(ControllerDigital::L1))
+		{
+			if (baseGripperPosition < 2)
+			{
+				baseGripperPosition++;
 			}
 		}
 		if (controller.getDigital(ControllerDigital::L2))
@@ -176,40 +206,33 @@ void opcontrol()
 				baseGripperPosition--;
 			}
 		}
-		if (controller.getDigital(ControllerDigital::L1))
-		{
-			if (baseGripperPosition < 2)
-			{
-				baseGripperPosition++;
-			}
-		}
 		if (controller.getDigital(ControllerDigital::A))
 		{
 			execute = false;
 		}
 		if (controller.getDigital(ControllerDigital::Y))
 		{
-			if (!pneumaticDebounce)
+			if (!debounceY)
 			{
 				pneumaticActivated = !pneumaticActivated;
-				pneumaticDebounce = true;
+				debounceY = true;
 			}
 		}
 		else
 		{
-			pneumaticDebounce = false;
+			debounceY = false;
 		}
 		if (controller.getDigital(ControllerDigital::X))
 		{
-			if (!ringMillDebounce)
+			if (!debounceX)
 			{
 				ringMillActivated = !ringMillActivated;
-				ringMillDebounce = true;
+				debounceX = true;
 			}
 		}
 		else
 		{
-			ringMillDebounce = false;
+			debounceX = false;
 		}
 
 		if (pneumaticActivated)
@@ -229,6 +252,7 @@ void opcontrol()
 		{
 			ringMillMotor.moveVelocity(0);
 		}
+		pros::lcd::print(2, "armPosition: %d", armPosition);
 		if (armPosition == 0)
 		{
 			motorArmLeft.moveAbsolute(ARM_POSITION_LOW, 50);
