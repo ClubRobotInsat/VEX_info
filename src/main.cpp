@@ -10,13 +10,12 @@ using namespace okapi;
 #define PORT_BR_WHEEL 4
 #define PORT_R_ARM 10
 #define PORT_L_ARM 9
-#define PORT_ARM_ROTATION 5
+#define PORT_BASE_GRIPPER_ROTATION 18
 #define PORT_GYROSCOPE 20
 #define PORT_RING_MILL 8
 #define PORT_BASE_GRIPPER 11
 #define PORT_PNEUMATICS 'A'
-#define PORT_BASE_GRIPPER_BUMPER 'B'
-#define PORT_ARM_BUMPER 'E'
+#define PORT_ARM_BUMPER 'F'
 
 // Wheels specifications
 #define WHEEL_DIRECTION_FL false
@@ -46,9 +45,9 @@ using namespace okapi;
 #define BASE_GRIPPER_DIRECTION true
 #define BASE_GRIPPER_GEARSET AbstractMotor::gearset::green
 #define BASE_GRIPPER_ENCODER_UNIT AbstractMotor::encoderUnits::degrees
-#define BASE_GRIPPER_POSITION_LOW 0
-#define BASE_GRIPPER_POSITION_DRIVE 50
-#define BASE_GRIPPER_POSITION_HIGH 100
+#define BASE_GRIPPER_POSITION_LOW 500
+#define BASE_GRIPPER_POSITION_DRIVE 250
+#define BASE_GRIPPER_POSITION_HIGH 0
 
 // Proportions
 #define WHEEL_DIAMETER 11_cm
@@ -64,13 +63,13 @@ Motor motorBR = Motor(PORT_BR_WHEEL, WHEEL_DIRECTION_BR, WHEEL_GEARSET, WHEEL_EN
 Motor ringMillMotor = Motor(PORT_RING_MILL, RING_MILL_DIRECTION, RING_MILL_GEARSET, RING_MILL_ENCODER_UNIT);
 pros::ADIPort pneumatic = pros::ADIPort(PORT_PNEUMATICS, ADI_DIGITAL_OUT);
 IMU gyroscope = IMU(PORT_GYROSCOPE);
-RotationSensor armRotation = RotationSensor(PORT_ARM_ROTATION);
+RotationSensor baseGripperRotation = RotationSensor(PORT_BASE_GRIPPER_ROTATION);
 Motor motorArmLeft = Motor(PORT_L_ARM, ARM_DIRECTION_L, ARM_GEARSET, ARM_ENCODER_UNIT);
 Motor motorArmRight = Motor(PORT_R_ARM, ARM_DIRECTION_R, ARM_GEARSET, ARM_ENCODER_UNIT);
 Motor motorBaseGripper = Motor(PORT_BASE_GRIPPER, BASE_GRIPPER_DIRECTION, BASE_GRIPPER_GEARSET, BASE_GRIPPER_ENCODER_UNIT);
 std::shared_ptr<ChassisController> drive;
 ADIButton armBumper = ADIButton(PORT_ARM_BUMPER);
-ADIButton baseGripperEndstop = ADIButton(PORT_BASE_GRIPPER_BUMPER, true);
+ADIButton armEndStop = ADIButton(PORT_ARM_BUMPER);
 
 /**
  * Runs initialization code. This occurs as soon as the program is started.
@@ -92,7 +91,7 @@ void initialize()
 	motorArmLeft.moveRelative(-100, 100);
 	motorArmRight.moveRelative(-100, 100);
 	pros::delay(400);
-	while (!baseGripperEndstop.isPressed())
+	while (!armEndStop.isPressed())
 	{
 		motorArmLeft.moveRelative(20, 100);
 		motorArmRight.moveRelative(20, 100);
@@ -100,13 +99,21 @@ void initialize()
 	motorArmLeft.moveRelative(-20, 50);
 	motorArmRight.moveRelative(-20, 50);
 	pros::delay(400);
-	while (!baseGripperEndstop.isPressed())
+	while (!armEndStop.isPressed())
 	{
 		motorArmLeft.moveRelative(1, 50);
 		motorArmRight.moveRelative(1, 50);
 	}
 	motorArmLeft.tarePosition();
 	motorArmRight.tarePosition();
+	while (baseGripperRotation.get() > 2){
+		motorBaseGripper.moveRelative(10,50);
+	}
+	motorBaseGripper.moveRelative(-1,50);
+	while (baseGripperRotation.get() > 2){
+		motorBaseGripper.moveRelative(5,50);
+	}
+	motorBaseGripper.tarePosition();
 }
 
 /**
@@ -163,6 +170,8 @@ void opcontrol()
 	bool debounceX = false;
 	bool debounceR1 = false;
 	bool debounceR2 = false;
+	bool debounceL1 = false;
+	bool debounceL2 = false;
 	int armPosition = 0;
 	int baseGripperPosition = 2;
 
@@ -194,17 +203,23 @@ void opcontrol()
 		}
 		if (controller.getDigital(ControllerDigital::L1))
 		{
-			if (baseGripperPosition < 2)
+			if (baseGripperPosition < 2 && !debounceL1)
 			{
 				baseGripperPosition++;
+				debounceL1 = true;
 			}
+		}else{
+			debounceL1 = false;
 		}
 		if (controller.getDigital(ControllerDigital::L2))
 		{
-			if (baseGripperPosition > 0)
+			if (baseGripperPosition > 0 && !debounceL2)
 			{
 				baseGripperPosition--;
+				debounceL2 = true;
 			}
+		}else{
+			debounceL2 = false;
 		}
 		if (controller.getDigital(ControllerDigital::A))
 		{
@@ -252,7 +267,8 @@ void opcontrol()
 		{
 			ringMillMotor.moveVelocity(0);
 		}
-		pros::lcd::print(2, "armPosition: %d", armPosition);
+		pros::lcd::print(2, "base gripper: %d", baseGripperPosition);
+		pros::lcd::print(3,"Rotation sensor value: %.2f",baseGripperRotation.get());
 		if (armPosition == 0)
 		{
 			motorArmLeft.moveAbsolute(ARM_POSITION_LOW, 50);
@@ -267,6 +283,18 @@ void opcontrol()
 		{
 			motorArmLeft.moveAbsolute(ARM_POSITION_HIGH, 50);
 			motorArmRight.moveAbsolute(ARM_POSITION_HIGH, 50);
+		}
+		if (baseGripperPosition == 0)
+		{
+			motorBaseGripper.moveAbsolute(BASE_GRIPPER_POSITION_LOW,50);
+		}
+		else if (baseGripperPosition == 1)
+		{
+			motorBaseGripper.moveAbsolute(BASE_GRIPPER_POSITION_DRIVE,50);
+		}
+		else if (baseGripperPosition == 2)
+		{
+			motorBaseGripper.moveAbsolute(BASE_GRIPPER_POSITION_HIGH,50);
 		}
 
 		drive->getModel()->arcade(
