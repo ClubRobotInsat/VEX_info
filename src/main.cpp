@@ -46,7 +46,7 @@ using namespace okapi;
 #define BASE_GRIPPER_GEARSET AbstractMotor::gearset::green
 #define BASE_GRIPPER_ENCODER_UNIT AbstractMotor::encoderUnits::degrees
 #define BASE_GRIPPER_POSITION_LOW 500
-#define BASE_GRIPPER_POSITION_DRIVE 250
+#define BASE_GRIPPER_POSITION_DRIVE 182
 #define BASE_GRIPPER_POSITION_HIGH 0
 
 // Proportions
