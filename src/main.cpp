@@ -16,6 +16,8 @@ using namespace okapi;
 #define PORT_BASE_GRIPPER 11
 #define PORT_PNEUMATICS 'A'
 #define PORT_ARM_BUMPER 'F'
+#define PORT_SENSORS_TRIGGER 'G'
+#define PORT_SENSOR1_DATA 'H'
 
 // Wheels specifications
 #define WHEEL_DIRECTION_FL false
@@ -45,12 +47,12 @@ using namespace okapi;
 #define BASE_GRIPPER_DIRECTION true
 #define BASE_GRIPPER_GEARSET AbstractMotor::gearset::green
 #define BASE_GRIPPER_ENCODER_UNIT AbstractMotor::encoderUnits::degrees
-#define BASE_GRIPPER_POSITION_LOW 500
-#define BASE_GRIPPER_POSITION_DRIVE 182
+#define BASE_GRIPPER_POSITION_LOW 550
+#define BASE_GRIPPER_POSITION_DRIVE 190
 #define BASE_GRIPPER_POSITION_HIGH 0
 
 // Proportions
-#define WHEEL_DIAMETER 11_cm
+#define WHEEL_DIAMETER 16_cm
 #define WHEEL_TRACK 43_cm
 
 // Global variables - sensors and actuators
@@ -62,7 +64,8 @@ Motor motorBL = Motor(PORT_BL_WHEEL, WHEEL_DIRECTION_BL, WHEEL_GEARSET, WHEEL_EN
 Motor motorBR = Motor(PORT_BR_WHEEL, WHEEL_DIRECTION_BR, WHEEL_GEARSET, WHEEL_ENCODER_UNIT);
 Motor ringMillMotor = Motor(PORT_RING_MILL, RING_MILL_DIRECTION, RING_MILL_GEARSET, RING_MILL_ENCODER_UNIT);
 pros::ADIPort pneumatic = pros::ADIPort(PORT_PNEUMATICS, ADI_DIGITAL_OUT);
-IMU gyroscope = IMU(PORT_GYROSCOPE);
+ADIUltrasonic ultraSonic1 = ADIUltrasonic(PORT_SENSORS_TRIGGER, PORT_SENSOR1_DATA, std::make_unique<MedianFilter<5>>());
+IMU gyroscope = IMU(PORT_GYROSCOPE,okapi::IMUAxes::z);
 RotationSensor baseGripperRotation = RotationSensor(PORT_BASE_GRIPPER_ROTATION);
 Motor motorArmLeft = Motor(PORT_L_ARM, ARM_DIRECTION_L, ARM_GEARSET, ARM_ENCODER_UNIT);
 Motor motorArmRight = Motor(PORT_R_ARM, ARM_DIRECTION_R, ARM_GEARSET, ARM_ENCODER_UNIT);
@@ -96,22 +99,24 @@ void initialize()
 		motorArmLeft.moveRelative(20, 100);
 		motorArmRight.moveRelative(20, 100);
 	}
-	motorArmLeft.moveRelative(-20, 50);
-	motorArmRight.moveRelative(-20, 50);
-	pros::delay(400);
-	while (!armEndStop.isPressed())
-	{
-		motorArmLeft.moveRelative(1, 50);
-		motorArmRight.moveRelative(1, 50);
-	}
+	// motorArmLeft.moveRelative(-20, 50);
+	// motorArmRight.moveRelative(-20, 50);
+	// pros::delay(400);
+	// while (!armEndStop.isPressed())
+	// {
+	// 	motorArmLeft.moveRelative(1, 50);
+	// 	motorArmRight.moveRelative(1, 50);
+	// }
 	motorArmLeft.tarePosition();
 	motorArmRight.tarePosition();
-	while (baseGripperRotation.get() > 2){
-		motorBaseGripper.moveRelative(10,50);
+	while (baseGripperRotation.get() > 2)
+	{
+		motorBaseGripper.moveRelative(10, 50);
 	}
-	motorBaseGripper.moveRelative(-1,50);
-	while (baseGripperRotation.get() > 2){
-		motorBaseGripper.moveRelative(5,50);
+	motorBaseGripper.moveRelative(-1, 50);
+	while (baseGripperRotation.get() > 2)
+	{
+		motorBaseGripper.moveRelative(5, 50);
 	}
 	motorBaseGripper.tarePosition();
 }
@@ -145,7 +150,8 @@ void competition_initialize() {}
  * will be stopped. Re-enabling the robot will restart the task, not re-start it
  * from where it left off.
  */
-void autonomous() {}
+void autonomous() {
+}
 
 /**
  * Runs the operator control code. This function will be started in its own task
@@ -172,6 +178,7 @@ void opcontrol()
 	bool debounceR2 = false;
 	bool debounceL1 = false;
 	bool debounceL2 = false;
+	bool debounceB = false;
 	int armPosition = 0;
 	int baseGripperPosition = 2;
 
@@ -191,7 +198,7 @@ void opcontrol()
 		}
 		if (controller.getDigital(ControllerDigital::R2))
 		{
-			if (armPosition > 0  && !debounceR2)
+			if (armPosition > 0 && !debounceR2)
 			{
 				armPosition--;
 				debounceR2 = true;
@@ -208,7 +215,9 @@ void opcontrol()
 				baseGripperPosition++;
 				debounceL1 = true;
 			}
-		}else{
+		}
+		else
+		{
 			debounceL1 = false;
 		}
 		if (controller.getDigital(ControllerDigital::L2))
@@ -218,7 +227,9 @@ void opcontrol()
 				baseGripperPosition--;
 				debounceL2 = true;
 			}
-		}else{
+		}
+		else
+		{
 			debounceL2 = false;
 		}
 		if (controller.getDigital(ControllerDigital::A))
@@ -268,7 +279,8 @@ void opcontrol()
 			ringMillMotor.moveVelocity(0);
 		}
 		pros::lcd::print(2, "base gripper: %d", baseGripperPosition);
-		pros::lcd::print(3,"Rotation sensor value: %.2f",baseGripperRotation.get());
+		pros::lcd::print(3, "Rotation sensor value: %.2f", baseGripperRotation.get());
+
 		if (armPosition == 0)
 		{
 			motorArmLeft.moveAbsolute(ARM_POSITION_LOW, 50);
@@ -286,21 +298,37 @@ void opcontrol()
 		}
 		if (baseGripperPosition == 0)
 		{
-			motorBaseGripper.moveAbsolute(BASE_GRIPPER_POSITION_LOW,50);
+			motorBaseGripper.moveAbsolute(BASE_GRIPPER_POSITION_LOW, 50);
 		}
 		else if (baseGripperPosition == 1)
 		{
-			motorBaseGripper.moveAbsolute(BASE_GRIPPER_POSITION_DRIVE,50);
+			motorBaseGripper.moveAbsolute(BASE_GRIPPER_POSITION_DRIVE, 50);
 		}
 		else if (baseGripperPosition == 2)
 		{
-			motorBaseGripper.moveAbsolute(BASE_GRIPPER_POSITION_HIGH,50);
+			motorBaseGripper.moveAbsolute(BASE_GRIPPER_POSITION_HIGH, 50);
+		}
+
+		if (controller.getDigital(ControllerDigital::B))
+		{
+			if (!debounceB)
+			{
+				drive->setMaxVelocity(80);
+				drive->moveDistance(10_cm);
+				debounceB = true;
+			}
+		}
+		else
+		{
+			debounceB = false;
 		}
 
 		drive->getModel()->arcade(
-			controller.getAnalog(ControllerAnalog::leftY),
-			controller.getAnalog(ControllerAnalog::leftX));
+		controller.getAnalog(ControllerAnalog::leftY),
+		controller.getAnalog(ControllerAnalog::leftX));
 
-		pros::delay(20);
+		pros::lcd::print(4, "Ultrasonic %.2f", ultraSonic1.get());
+		pros::delay(1000);
+
 	}
 }
