@@ -16,8 +16,13 @@ using namespace okapi;
 #define PORT_BASE_GRIPPER 11
 #define PORT_PNEUMATICS 'A'
 #define PORT_ARM_BUMPER 'F'
-#define PORT_SENSORS_TRIGGER 'G'
-#define PORT_SENSOR1_DATA 'H'
+#define PORT_SENSOR1_TRIGGER 'C'
+#define PORT_SENSOR1_DATA 'D'
+#define PORT_SENSOR2_TRIGGER 'E'
+#define PORT_SENSOR2_DATA 'F'
+#define PORT_SENSOR3_TRIGGER 'G'
+#define PORT_SENSOR3_DATA 'H'
+
 
 // Wheels specifications
 #define WHEEL_DIRECTION_FL false
@@ -64,7 +69,9 @@ Motor motorBL = Motor(PORT_BL_WHEEL, WHEEL_DIRECTION_BL, WHEEL_GEARSET, WHEEL_EN
 Motor motorBR = Motor(PORT_BR_WHEEL, WHEEL_DIRECTION_BR, WHEEL_GEARSET, WHEEL_ENCODER_UNIT);
 Motor ringMillMotor = Motor(PORT_RING_MILL, RING_MILL_DIRECTION, RING_MILL_GEARSET, RING_MILL_ENCODER_UNIT);
 pros::ADIPort pneumatic = pros::ADIPort(PORT_PNEUMATICS, ADI_DIGITAL_OUT);
-ADIUltrasonic ultraSonic1 = ADIUltrasonic(PORT_SENSORS_TRIGGER, PORT_SENSOR1_DATA, std::make_unique<MedianFilter<5>>());
+ADIUltrasonic ultraSonic1 = ADIUltrasonic(PORT_SENSOR1_TRIGGER, PORT_SENSOR1_DATA, std::make_unique<MedianFilter<5>>());
+ADIUltrasonic ultraSonic2 = ADIUltrasonic(PORT_SENSOR2_TRIGGER, PORT_SENSOR2_DATA, std::make_unique<MedianFilter<5>>());
+ADIUltrasonic ultraSonic3 = ADIUltrasonic(PORT_SENSOR3_TRIGGER, PORT_SENSOR3_DATA, std::make_unique<MedianFilter<5>>());
 IMU gyroscope = IMU(PORT_GYROSCOPE,okapi::IMUAxes::z);
 RotationSensor baseGripperRotation = RotationSensor(PORT_BASE_GRIPPER_ROTATION);
 Motor motorArmLeft = Motor(PORT_L_ARM, ARM_DIRECTION_L, ARM_GEARSET, ARM_ENCODER_UNIT);
