@@ -81,6 +81,62 @@ std::shared_ptr<ChassisController> drive;
 ADIButton armBumper = ADIButton(PORT_ARM_BUMPER);
 ADIButton armEndStop = ADIButton(PORT_ARM_BUMPER);
 
+// Bug 0 algorithm
+void bug0(){
+	 // Rotates towards goal
+    // while not arrived
+        // Forward
+        // if obstacle encountered (< front threshold)
+            // while no obstacle on left or not arrived
+                // while < front threshold or < left threshold
+                    // rotate right
+                // Forward
+}
+
+void bug1(){
+	// Same as bug0 except the robot moves around the WHOLE object and goes back to closest point from the goal
+	// Rotates towards the goal
+	// while not arrived
+		// Forward
+		// if obstacle encountered
+			// While not full loop around obstacle or not arrived
+				// Record position
+				// Compare to distance
+				// While < front threshold or < left threshold
+					// Rotate right
+				// Forward
+			// Go to closest position
+}
+
+void bug2(){
+	// Rotates towards goal
+	// while not arrived
+		// Follow m-line -> straight line towards goal
+		// if obstacle encountered
+			// while not arrived and not initial position and not m-line is re-encountered and d(x,goal) < d(obstacleX,goal) and no obstacle in front
+				// While < front threshold or < left threshold
+					// Rotate right
+				// Forward
+
+}
+
+// n being a point somewhere
+// heurisitc = distance(x,n) + distance(n,goal)
+void tangentBug(){
+	// While not arrived
+		// if obstacle encountered or heurisitc increases
+			// while not arrived and not initial position (obstacle) and not d_leave < d_min
+				// d_min = shortest distance observed so far between sensed obstacle and the goal
+				// d_leave = shortest distance between any point in the sensed environment and the goal
+		// else
+			// choose direction that minize heurisitc
+}
+
+
+
+
+
+
 /**
  * Runs initialization code. This occurs as soon as the program is started.
  *
