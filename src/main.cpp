@@ -16,8 +16,8 @@ using namespace okapi;
 #define PORT_BASE_GRIPPER 11
 #define PORT_PNEUMATICS 'A'
 #define PORT_ARM_BUMPER 'F'
-#define PORT_SENSOR1_TRIGGER 'C'
-#define PORT_SENSOR1_DATA 'D'
+#define PORT_SENSOR1_TRIGGER 'A'
+#define PORT_SENSOR1_DATA 'B'
 #define PORT_SENSOR2_TRIGGER 'E'
 #define PORT_SENSOR2_DATA 'F'
 #define PORT_SENSOR3_TRIGGER 'G'
@@ -67,11 +67,11 @@ Motor motorFR = Motor(PORT_FR_WHEEL, WHEEL_DIRECTION_FR, WHEEL_GEARSET, WHEEL_EN
 Motor motorBL = Motor(PORT_BL_WHEEL, WHEEL_DIRECTION_BL, WHEEL_GEARSET, WHEEL_ENCODER_UNIT);
 Motor motorBR = Motor(PORT_BR_WHEEL, WHEEL_DIRECTION_BR, WHEEL_GEARSET, WHEEL_ENCODER_UNIT);
 Motor ringMillMotor = Motor(PORT_RING_MILL, RING_MILL_DIRECTION, RING_MILL_GEARSET, RING_MILL_ENCODER_UNIT);
-pros::ADIPort pneumatic = pros::ADIPort(PORT_PNEUMATICS, ADI_DIGITAL_OUT);
-ADIUltrasonic ultraSonic1 = ADIUltrasonic(PORT_SENSOR1_TRIGGER, PORT_SENSOR1_DATA, std::make_unique<MedianFilter<5>>());
-ADIUltrasonic ultraSonic2 = ADIUltrasonic(PORT_SENSOR2_TRIGGER, PORT_SENSOR2_DATA, std::make_unique<MedianFilter<5>>());
-ADIUltrasonic ultraSonic3 = ADIUltrasonic(PORT_SENSOR3_TRIGGER, PORT_SENSOR3_DATA, std::make_unique<MedianFilter<5>>());
-IMU gyroscope = IMU(PORT_GYROSCOPE,okapi::IMUAxes::z);
+// pros::ADIPort pneumatic = pros::ADIPort(PORT_PNEUMATICS, ADI_DIGITAL_OUT);
+ADIUltrasonic ultraSonicLeft = ADIUltrasonic(PORT_SENSOR1_TRIGGER, PORT_SENSOR1_DATA);
+ADIUltrasonic ultraSonicMiddle = ADIUltrasonic(PORT_SENSOR2_TRIGGER, PORT_SENSOR2_DATA);
+ADIUltrasonic ultraSonicRight = ADIUltrasonic(PORT_SENSOR3_TRIGGER, PORT_SENSOR3_DATA);
+IMU gyroscope = IMU(PORT_GYROSCOPE, okapi::IMUAxes::z);
 RotationSensor baseGripperRotation = RotationSensor(PORT_BASE_GRIPPER_ROTATION);
 Motor motorArmLeft = Motor(PORT_L_ARM, ARM_DIRECTION_L, ARM_GEARSET, ARM_ENCODER_UNIT);
 Motor motorArmRight = Motor(PORT_R_ARM, ARM_DIRECTION_R, ARM_GEARSET, ARM_ENCODER_UNIT);
@@ -89,42 +89,14 @@ std::shared_ptr<ChassisController> drive;
 void initialize()
 {
 	pros::lcd::initialize();
-	motorBaseGripper.setBrakeMode(AbstractMotor::brakeMode::hold);
-	const MotorGroup leftMotors = {motorBL, motorFL};
-	const MotorGroup rightMotors = {motorBR, motorFR};
+	pros::lcd::print(0, "Initializing");
 	drive = ChassisControllerBuilder()
-				.withMotors(leftMotors, rightMotors)
+				.withMotors(motorFL, motorFR, motorBR, motorBL)
 				.withDimensions(WHEEL_GEARSET, {{WHEEL_DIAMETER, WHEEL_TRACK}, imev5GreenTPR})
 				.build();
-
-	// motorArmLeft.moveRelative(-100, 100);
-	// motorArmRight.moveRelative(-100, 100);
-	// pros::delay(400);
-	// while (!armEndStop.isPressed())
-	// {
-	// 	motorArmLeft.moveRelative(20, 100);
-	// 	motorArmRight.moveRelative(20, 100);
-	// }
-	// motorArmLeft.moveRelative(-20, 50);
-	// motorArmRight.moveRelative(-20, 50);
-	// pros::delay(400);
-	// while (!armEndStop.isPressed())
-	// {
-	// 	motorArmLeft.moveRelative(1, 50);
-	// 	motorArmRight.moveRelative(1, 50);
-	// }
-	// motorArmLeft.tarePosition();
-	// motorArmRight.tarePosition();
-	// while (baseGripperRotation.get() > 2)
-	// {
-	// 	motorBaseGripper.moveRelative(10, 50);
-	// }
-	// motorBaseGripper.moveRelative(-1, 50);
-	// while (baseGripperRotation.get() > 2)
-	// {
-	// 	motorBaseGripper.moveRelative(5, 50);
-	// }
-	// motorBaseGripper.tarePosition();
+	pros::delay(2000);
+	while (ultraSonicMiddle.get() == 0)
+		;
 }
 
 /**
@@ -156,7 +128,8 @@ void competition_initialize() {}
  * will be stopped. Re-enabling the robot will restart the task, not re-start it
  * from where it left off.
  */
-void autonomous() {
+void autonomous()
+{
 }
 
 /**
@@ -173,170 +146,56 @@ void autonomous() {
  * task, not resume it from where it left off.
  */
 
+void moveToAngle(double currentAngle, double desiredAngle, double precision)
+{
+	if (abs(currentAngle - desiredAngle) > precision)
+	{
+		drive->turnAngle(QAngle(-(currentAngle - desiredAngle) * degree));
+	}
+}
+
+void moveToDistance(double currentDistance, double desiredDistance, double precision)
+{
+	if (abs(currentDistance - desiredDistance) > precision)
+	{
+		drive->moveDistance((currentDistance - desiredDistance) * millimeter);
+	}
+}
+
+void moveStraight(double distance) {
+	drive->moveDistance(distance *millimeter);
+}
+
 void opcontrol()
 {
 	bool execute = true;
-	bool pneumaticActivated = false;
-	bool ringMillActivated = false;
-	bool debounceY = false;
-	bool debounceX = false;
-	bool debounceR1 = false;
-	bool debounceR2 = false;
-	bool debounceL1 = false;
-	bool debounceL2 = false;
-	bool debounceB = false;
-	int armPosition = 0;
-	int baseGripperPosition = 2;
+	double desiredAngle = 10;
+	double maxAngleError = 5;
+	double desiredDistance = 200;
+	double maxDistanceError = 10;
+	double currentAngle;
+	double leftDistance;
+	double middleDistance;
+	double rightDistance;
 
 	while (execute)
 	{
-		if (controller.getDigital(ControllerDigital::R1))
-		{
-			if (armPosition < 2 && !debounceR1)
-			{
-				armPosition++;
-				debounceR1 = true;
-			}
-		}
-		else
-		{
-			debounceR1 = false;
-		}
-		if (controller.getDigital(ControllerDigital::R2))
-		{
-			if (armPosition > 0 && !debounceR2)
-			{
-				armPosition--;
-				debounceR2 = true;
-			}
-		}
-		else
-		{
-			debounceR2 = false;
-		}
-		if (controller.getDigital(ControllerDigital::L1))
-		{
-			if (baseGripperPosition < 2 && !debounceL1)
-			{
-				baseGripperPosition++;
-				debounceL1 = true;
-			}
-		}
-		else
-		{
-			debounceL1 = false;
-		}
-		if (controller.getDigital(ControllerDigital::L2))
-		{
-			if (baseGripperPosition > 0 && !debounceL2)
-			{
-				baseGripperPosition--;
-				debounceL2 = true;
-			}
-		}
-		else
-		{
-			debounceL2 = false;
-		}
-		if (controller.getDigital(ControllerDigital::A))
-		{
-			execute = false;
-		}
-		if (controller.getDigital(ControllerDigital::Y))
-		{
-			if (!debounceY)
-			{
-				pneumaticActivated = !pneumaticActivated;
-				debounceY = true;
-			}
-		}
-		else
-		{
-			debounceY = false;
-		}
-		if (controller.getDigital(ControllerDigital::X))
-		{
-			if (!debounceX)
-			{
-				ringMillActivated = !ringMillActivated;
-				debounceX = true;
-			}
-		}
-		else
-		{
-			debounceX = false;
-		}
+		leftDistance = ultraSonicLeft.get();
+		middleDistance = ultraSonicMiddle.get();
+		rightDistance = ultraSonicRight.get();
+		currentAngle = gyroscope.get();
 
-		if (pneumaticActivated)
-		{
-			pneumatic.set_value(1);
-		}
-		else
-		{
-			pneumatic.set_value(0);
-		}
+		// DEBUG
+		pros::lcd::print(0, "UltrasonicLeft %.2f mm", leftDistance);
+		pros::lcd::print(1, "UltrasonicMiddle %.2f mm", middleDistance);
+		pros::lcd::print(2, "UltrasonicRight %.2f mm", rightDistance);
+		pros::lcd::print(3, "gyroscope %.2f degrees", currentAngle);
 
-		if (ringMillActivated)
-		{
-			ringMillMotor.moveVelocity(RING_MILL_MAX_VELOCITY);
-		}
-		else
-		{
-			ringMillMotor.moveVelocity(0);
-		}
-		pros::lcd::print(2, "base gripper: %d", baseGripperPosition);
-		pros::lcd::print(3, "Rotation sensor value: %.2f", baseGripperRotation.get());
+		moveToAngle(currentAngle, desiredAngle, maxAngleError);
+		moveToDistance(middleDistance, desiredDistance, maxDistanceError);
+		moveStraight(10);
 
-		if (armPosition == 0)
-		{
-			motorArmLeft.moveAbsolute(ARM_POSITION_LOW, 50);
-			motorArmRight.moveAbsolute(ARM_POSITION_LOW, 50);
-		}
-		else if (armPosition == 1)
-		{
-			motorArmLeft.moveAbsolute(ARM_POSITION_DRIVE, 50);
-			motorArmRight.moveAbsolute(ARM_POSITION_DRIVE, 50);
-		}
-		else if (armPosition == 2)
-		{
-			motorArmLeft.moveAbsolute(ARM_POSITION_HIGH, 50);
-			motorArmRight.moveAbsolute(ARM_POSITION_HIGH, 50);
-		}
-		if (baseGripperPosition == 0)
-		{
-			motorBaseGripper.moveAbsolute(BASE_GRIPPER_POSITION_LOW, 50);
-		}
-		else if (baseGripperPosition == 1)
-		{
-			motorBaseGripper.moveAbsolute(BASE_GRIPPER_POSITION_DRIVE, 50);
-		}
-		else if (baseGripperPosition == 2)
-		{
-			motorBaseGripper.moveAbsolute(BASE_GRIPPER_POSITION_HIGH, 50);
-		}
-
-		if (controller.getDigital(ControllerDigital::B))
-		{
-			if (!debounceB)
-			{
-				drive->setMaxVelocity(80);
-				drive->moveDistance(10_cm);
-				debounceB = true;
-			}
-		}
-		else
-		{
-			debounceB = false;
-		}
-
-		drive->getModel()->arcade(
-		controller.getAnalog(ControllerAnalog::leftY),
-		controller.getAnalog(ControllerAnalog::leftX));
-
-		pros::lcd::print(2, "Ultrasonic1 %.2f mm", ultraSonic1.get());
-		pros::lcd::print(3, "Ultrasonic2 %.2f mm", ultraSonic2.get());
-		pros::lcd::print(4, "Ultrasonic3 %.2f mm", ultraSonic3.get());
-		pros::delay(100);
-
+		// Delay between iteraction
+		pros::delay(50);
 	}
 }
