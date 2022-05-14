@@ -25,11 +25,11 @@ using namespace okapi;
 #define WHEEL_ENCODER_UNIT AbstractMotor::encoderUnits::rotations
 
 // Proportions
-#define WHEEL_DIAMETER 16_cm
-#define WHEEL_TRACK 43_cm
+#define WHEEL_DIAMETER 10.2_cm*84/60
+#define WHEEL_TRACK 38_cm
 
-#define X_TARGET 15
-#define Y_TARGET 25
+#define X_TARGET 15.0
+#define Y_TARGET 25.0
 
 // sensors and actuators
 Controller controller;
@@ -44,8 +44,8 @@ IMU gyroscope = IMU(PORT_GYROSCOPE, okapi::IMUAxes::z);
 std::shared_ptr<ChassisController> drive;
 
 // Global position of the robot and the target
-std::pair<int, int> robotPosition(0, 0);
-std::pair<int, int> targetPosition(X_TARGET, Y_TARGET);
+std::pair<double, double> robotPosition(0, 0);
+std::pair<double, double> targetPosition(X_TARGET, Y_TARGET);
 
 // Bug 0 algorithm
 
@@ -231,10 +231,10 @@ std::pair<double, double> getStrategyNextMove(
 	return std::make_pair(moveDist, moveAngle);
 }
 
-void recalculatePosition(std::pair<double, double> move)
+void recalculatePosition(double distance, double angle)
 {
-	robotPosition.first += move.first * cos(move.second);
-	robotPosition.second += move.first * sin(move.second);
+	robotPosition.first += distance * sin(angle*2*PI/360);
+	robotPosition.second += distance * cos(angle*2*PI/360);
 }
 
 void opcontrol()
@@ -244,13 +244,12 @@ void opcontrol()
 	double maxAngleError = 5.0;
 	double desiredDistance = 200;
 	double maxDistanceError = 10;
-	double currentAngle;
+	double currentAngle = 0;
 	std::tuple<double, double, double> sensorsDistance;
-	std::pair<double, double> nextMove;
+	std::pair<double, double> nextMove(0,0);
 
 	while (execute)
 	{
-		currentAngle = gyroscope.get();
 		sensorsDistance = {ultraSonicLeft.get(), ultraSonicMiddle.get(), ultraSonicRight.get()};
 
 		// DEBUG
@@ -263,8 +262,8 @@ void opcontrol()
 		nextMove = getStrategyNextMove(currentAngle, sensorsDistance);
 		moveToAngle(currentAngle, nextMove.second, maxAngleError);
 		moveStraight(nextMove.first);
-		recalculatePosition(nextMove);
-		pros::lcd::print(5, "nextMove %.2f %.2f", nextMove.first, nextMove.second);
+		currentAngle = gyroscope.get();
+		recalculatePosition(nextMove.first, currentAngle);
 
 		// Delay between iteraction
 		pros::delay(50);
