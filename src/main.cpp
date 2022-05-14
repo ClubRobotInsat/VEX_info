@@ -46,78 +46,6 @@ double xRobot;
 double yRobot;
 
 // Bug 0 algorithm
-void bug0(double xGoal, double yGoal)
-{
-	// TODO - Update defined values
-	// #define FRONT_THRESHOLD 5
-	// #define LEFT_THRESHOLD 5
-	// #define RIGHT_THRESHOLD 5
-	// #define LEFT_NO_OBSTACLE 5000
-
-	// double dx = xGoal - xRobot;
-	// double dy = yGoal - yRobot;
-	// // 0 - 255 but result between 0. 1.0
-	// double teta = 0;
-	// double innerRotation = 0;
-
-	// while (dx > 1 and dy > 1){ // while not arrived
-	// 	dx = xGoal - xRobot;
-	// 	dy = yGoal - yRobot;
-	// 	if (ultraSonic1.get() < FRONT_THRESHOLD){ // if obstacle encountered (< front threshold)
-	// 		// TODO - Rotate right big
-	// 		// TODO - Modify increment
-	// 		innerRotation += 45;
-	// 		while((ultraSonic2.get() < LEFT_NO_OBSTACLE) && (ultraSonic1.get() > FRONT_THRESHOLD) && (dx > 1) && (dy >1)){
-	// 			// TODO - Forward
-	// 			// TODO - Modify increment
-	// 			xRobot += 5;
-	// 			yRobot += 5;
-	// 			if (ultraSonic2.get()<LEFT_THRESHOLD){
-	// 				while(ultraSonic2.get()<LEFT_THRESHOLD){
-	// 					// TODO - Rotate right
-	// 					// TODO - Modify rotation increment
-	// 					innerRotation += 5;
-	// 				}
-	// 			}
-
-	// 		}
-
-	// 	}else{
-	// 		teta = 256 * arctan2(dx,dy) + innerRotation;
-	// 		// TODO -  Rotates towards goal
-	// 		// TODO - Forward
-	// 		// TODO - Modify increment
-	// 		xRobot += 5;
-	// 		yRobot += 5;
-	// 	}
-
-	// }
-}
-// TODO - Complete
-void bug1(double xGoal, double yGoal)
-{
-	// double dx = xGoal - xRobot;
-	// double dy = yGoal - yRobot;
-	// // 0 - 255 but result between 0. 1.0
-	// double teta = 0;
-	// double innerRotation = 0;
-	// double initX = xRobot;
-	// double initY = yRobot;
-
-	// while (dx > 1 and dy > 1){ // while not arrived
-	// 	dx = xGoal - xRobot;
-	// 	dy = yGoal - yRobot;
-	// 	if (ultraSonic1.get() < FRONT_THRESHOLD){
-
-	// 	}else{
-	// 		teta = 256 * arctan2(dx,dy) + innerRotation;
-	// 		// TODO -  Rotates towards goal
-	// 		// TODO - Forward
-	// 		// TODO - Modify increment
-	// 		xRobot += 5;
-	// 		yRobot += 5;
-	// 	}
-	// }
 
 	// Same as bug0 except the robot moves around the WHOLE object and goes back to closest point from the goal
 	// Rotates towards the goal
@@ -131,18 +59,57 @@ void bug1(double xGoal, double yGoal)
 	// Rotate right
 	// Forward
 	// Go to closest position
-}
 
-void bug2()
-{
+
+void bug2(double xGoal, double yGoal){
+	double dx = xGoal - xRobot;
+	double dy = yGoal - yRobot;
+	// 0 - 255 but result between 0. 1.0
+	double teta = 255 * arctan2(dx,dy);
+	double innerRotation = 0;
+	double initX = xRobot;
+	double initY = yRobot;
+	double xHitPoint = 0;
+	double yHitPoint = 0;
+	// For the m-line equation
+	double alphaLine = dy/dx;
+	double betaLine = yGoal - (alphaLine*xGoal);
+
+	// TODO -Increment position for each movement
 	// Rotates towards goal
-	// while not arrived
-	// Follow m-line -> straight line towards goal
-	// if obstacle encountered
-	// while not arrived and not initial position and not m-line is re-encountered and d(x,goal) < d(obstacleX,goal) and no obstacle in front
-	// While < front threshold or < left threshold
-	// Rotate right
-	// Forward
+	moveToAngle(0, teta, 0.5);
+	while (dx > 1 and dy > 1){ // while not arrived
+
+		// if obstacle encountered
+		if (ultraSonicMiddle.get() < FRONT_THRESHOLD){
+			// Memorize hitpoint
+			xHitPoint = xRobot;
+			yHitPoint = yRobot;
+			// while not arrived and not m-line is re-encountered
+			// aka find if xRobot yRobot are part of the line
+			while((dx > 1) and (dy > 1) and (yRobot != xGoal*alphaLine + betaLine)){
+				// Follow obstacle
+				if (ultraSonicMiddle.get() < FRONT_THRESHOLD){
+					// move right
+					moveToAngle(0,45,0.5);
+					innerRotation += 45;
+				}else if (ultraSonicLeft.get() > LEFT_THRESHOLD){
+					//move left
+					moveToAngle(0,-45,0.5);
+					innerRotation += -45;
+				}else{
+					moveStraight(50);
+				}
+
+			}
+			teta = 255 * arctan2(dx,dy) + innerRotation;
+		}
+		// Follow m-line -> straight line towards goal
+		moveToAngle(0, teta, 0.5);
+		moveStraight(100); // millimeters
+
+	}
+
 }
 
 // n being a point somewhere
