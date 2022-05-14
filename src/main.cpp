@@ -275,7 +275,7 @@ void bug0(double xGoal, double yGoal){
 			}
 
 		}else{
-			teta = 256 * arctan2(dx,dy) + innerRotation;
+			teta = 255 * arctan2(dx,dy) + innerRotation;
 			// TODO -  Rotates towards goal
 			// TODO - Forward
 			// TODO - Modify increment
@@ -302,7 +302,7 @@ void bug1(double xGoal, double yGoal){
 		if (ultraSonic1.get() < FRONT_THRESHOLD){
 
 		}else{
-			teta = 256 * arctan2(dx,dy) + innerRotation;
+			teta = 255 * arctan2(dx,dy) + innerRotation;
 			// TODO -  Rotates towards goal
 			// TODO - Forward
 			// TODO - Modify increment
@@ -328,15 +328,54 @@ void bug1(double xGoal, double yGoal){
 			// Go to closest position
 }
 
-void bug2(){
+void bug2(double xGoal, double yGoal){
+	double dx = xGoal - xRobot;
+	double dy = yGoal - yRobot;
+	// 0 - 255 but result between 0. 1.0
+	double teta = 255 * arctan2(dx,dy);
+	double innerRotation = 0;
+	double initX = xRobot;
+	double initY = yRobot;
+	double xHitPoint = 0;
+	double yHitPoint = 0;
+	// For the m-line equation
+	double alphaLine = dy/dx;
+	double betaLine = yGoal - (alphaLine*xGoal);
+
+	// TODO -Increment position for each movement
 	// Rotates towards goal
-	// while not arrived
-		// Follow m-line -> straight line towards goal
+	moveToAngle(0, teta, 0.5);
+	while (dx > 1 and dy > 1){ // while not arrived
+
 		// if obstacle encountered
-			// while not arrived and not initial position and not m-line is re-encountered and d(x,goal) < d(obstacleX,goal) and no obstacle in front
-				// While < front threshold or < left threshold
-					// Rotate right
-				// Forward
+		if (ultraSonicMiddle.get() < FRONT_THRESHOLD){
+			// Memorize hitpoint
+			xHitPoint = xRobot;
+			yHitPoint = yRobot;
+			// while not arrived and not m-line is re-encountered
+			// aka find if xRobot yRobot are part of the line
+			while((dx > 1) and (dy > 1) and (yRobot != xGoal*alphaLine + betaLine)){
+				// Follow obstacle
+				if (ultraSonicMiddle.get() < FRONT_THRESHOLD){
+					// move right
+					moveToAngle(0,45,0.5);
+					innerRotation += 45;
+				}else if (ultraSonicLeft.get() > LEFT_THRESHOLD){
+					//move left
+					moveToAngle(0,-45,0.5);
+					innerRotation += -45;
+				}else{
+					moveStraight(50);
+				}
+
+			}
+			teta = 255 * arctan2(dx,dy) + innerRotation;
+		}
+		// Follow m-line -> straight line towards goal
+		moveToAngle(0, teta, 0.5);
+		moveStraight(100); // millimeters
+
+	}
 
 }
 
