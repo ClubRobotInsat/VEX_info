@@ -28,8 +28,13 @@ using namespace okapi;
 #define WHEEL_DIAMETER 10.2_cm*84/60
 #define WHEEL_TRACK 38_cm
 
-#define X_TARGET 15.0
-#define Y_TARGET 25.0
+#define X_TARGET 100.0
+#define Y_TARGET 50.0
+
+// Threshold for sensors
+#define FRONT_THRESHOLD 250
+#define LEFT_THRESHOLD 200
+#define RIGHT_THRESHOLD 200
 
 // sensors and actuators
 Controller controller;
@@ -47,70 +52,134 @@ std::shared_ptr<ChassisController> drive;
 std::pair<double, double> robotPosition(0, 0);
 std::pair<double, double> targetPosition(X_TARGET, Y_TARGET);
 
-// Bug 0 algorithm
+// Global variables for bug2 memory equations
+bool createdLine = false;
+double alphaLine = -1;
+double betaLine = -1;
+double foundObstacle = false;
 
-// Same as bug0 except the robot moves around the WHOLE object and goes back to closest point from the goal
-// Rotates towards the goal
-// while not arrived
-// Forward
-// if obstacle encountered
-// While not full loop around obstacle or not arrived
-// Record position
-// Compare to distance
-// While < front threshold or < left threshold
-// Rotate right
-// Forward
-// Go to closest position
+// Enum for next move algorithms
+enum ALGORITHM {
+	BUG0,BUG1,BUG2
+};
 
-void bug2(double xGoal, double yGoal)
-{
-	// double dx = xGoal - xRobot;
-	// double dy = yGoal - yRobot;
-	// // 0 - 255 but result between 0. 1.0
-	// double teta = 255 * arctan2(dx,dy);
-	// double innerRotation = 0;
-	// double initX = xRobot;
-	// double initY = yRobot;
-	// double xHitPoint = 0;
-	// double yHitPoint = 0;
-	// // For the m-line equation
-	// double alphaLine = dy/dx;
-	// double betaLine = yGoal - (alphaLine*xGoal);
+enum SENSORS{
+	LEFT,MIDDLE,RIGHT
+};
 
-	// // TODO -Increment position for each movement
-	// // Rotates towards goal
-	// moveToAngle(0, teta, 0.5);
-	// while (dx > 1 and dy > 1){ // while not arrived
+// std::pair<double,double> bug0(double currentAngle, std::tuple<double, double, double> sensorsDistance){
+// 	double dx = targetPosition.first - robotPosition.first;
+// 	double dy = targetPosition.second - robotPosition.second;
+// 	// 0 - 255 but result between 0. 1.0
+// 	double teta = atan2(targetPosition.second,targetPosition.first)-currentAngle;
+// 	double innerRotation = 0;
+// 	double initX = robotPosition.first;
+// 	double initY = robotPosition.second;
+// 	double xHitPoint = 0;
+// 	double yHitPoint = 0;
+// 	double moveDist = 50;
+// 	double moveAngle = 0;
 
-	// 	// if obstacle encountered
-	// 	if (ultraSonicMiddle.get() < FRONT_THRESHOLD){
-	// 		// Memorize hitpoint
-	// 		xHitPoint = xRobot;
-	// 		yHitPoint = yRobot;
-	// 		// while not arrived and not m-line is re-encountered
-	// 		// aka find if xRobot yRobot are part of the line
-	// 		while((dx > 1) and (dy > 1) and (yRobot != xGoal*alphaLine + betaLine)){
-	// 			// Follow obstacle
-	// 			if (ultraSonicMiddle.get() < FRONT_THRESHOLD){
-	// 				// move right
-	// 				moveToAngle(0,45,0.5);
-	// 				innerRotation += 45;
-	// 			}else if (ultraSonicLeft.get() > LEFT_THRESHOLD){
-	// 				//move left
-	// 				moveToAngle(0,-45,0.5);
-	// 				innerRotation += -45;
-	// 			}else{
-	// 				moveStraight(50);
-	// 			}
+// 	if (std::get<LEFT>(sensorsDistance) < LEFT_THRESHOLD)
+// 	{
+// 		moveAngle = teta;
+// 		moveDist = 0;
+// 	}
+// 	if (std::get<MIDDLE>(sensorsDistance) < FRONT_THRESHOLD){
+// 		moveAngle = 45;
+// 	}
+// 	if (std::get<LEFT>(sensorsDistance)< FRONT_THRESHOLD){
 
-	// 		}
-	// 		teta = 255 * arctan2(dx,dy) + innerRotation;
-	// 	}
-	// 	// Follow m-line -> straight line towards goal
-	// 	moveToAngle(0, teta, 0.5);
-	// 	moveStraight(100); // millimeters
+// 		if (ultraSonicMiddle.get() < FRONT_THRESHOLD){ // if obstacle encountered (< front threshold)
+// 			// Rotate right big
+// 			moveToAngle(0.0, 90.0, 5.0);
+// 			// Modify increment
+// 			innerRotation += 45;
+// 			while((ultraSonicLeft.get() < LEFT_NO_OBSTACLE) && (ultraSonicMiddle.get() > FRONT_THRESHOLD) && (dx > 1) && (dy >1)){
+// 				// Forward
+// 				moveStraight(50.0);
+// 				// Modify increment
+// 				// TODO - Update position
+// 				if (ultraSonicLeft.get()<LEFT_THRESHOLD){
+// 					while(ultraSonicLeft.get()<LEFT_THRESHOLD){
+// 						// Rotate right
+// 						moveToAngle(0.0, 5.0, 0.5);
+// 						// Modify rotation increment
+// 						innerRotation += 5.0;
+// 					}
+// 				}
 
-	// }
+// 			}
+
+// 		}else{
+// 			teta = 256 * arctan2(dx,dy) + innerRotation;
+// 			// Rotates towards goal
+// 			moveToAngle(0.0, teta, 0.5);
+// 			// Forward
+// 			moveStraight(50.0);
+// 			// Modify increment
+// 			// TODO - Update position
+// 		}
+
+// 	}
+
+// }
+
+// Switch with angle instead of position
+std::pair<double,double> bug2(double currentAngle, std::tuple<double, double, double> sensorsDistance){
+	double dx = targetPosition.first - robotPosition.first;
+	double dy = targetPosition.second - robotPosition.second;
+	// Target - Position
+	double teta = atan2(targetPosition.second,targetPosition.first)*360/(2*PI)-currentAngle;
+	double innerRotation = 0;
+	double initX = robotPosition.first;
+	double initY = robotPosition.second;
+	double xHitPoint = 0;
+	double yHitPoint = 0;
+	double moveDist = 0;
+	double moveAngle = 0;
+
+	// Obstacle following mode
+	if (foundObstacle)
+	{
+		// if we cross m-line rotate towards goal
+		if (targetPosition.second == (targetPosition.first*alphaLine + betaLine))
+		{
+			if(targetPosition.first > robotPosition.first){
+				moveAngle = 180-atan2(dy,dx)*360/(2*PI);
+			}else{
+				moveAngle = atan2(dy,dx)*360/(2*PI);
+			}
+			// Quit obstacle
+			foundObstacle = false;
+		}else if (std::get<LEFT>(sensorsDistance) < LEFT_THRESHOLD or std::get<MIDDLE>(sensorsDistance) < FRONT_THRESHOLD) // too close from the obstacle
+		{
+			moveAngle = 10;
+		}else if (std::get<LEFT>(sensorsDistance) > LEFT_THRESHOLD) // Too far from obstacle
+		{
+			moveAngle = -10;
+		}else{
+			moveDist = 5;
+		}
+
+	} else // Normal mode
+	{
+		if (!createdLine) // Create m-line to follow
+		{
+			alphaLine = dy/dx;
+			betaLine = targetPosition.second - (alphaLine*targetPosition.first);
+			// Rotate towards target
+			moveAngle = teta;
+			createdLine = true;
+		}else if (std::get<MIDDLE>(sensorsDistance) < FRONT_THRESHOLD) // Encountered obstacle
+		{
+			foundObstacle = true;
+		}else{
+			moveDist = 15;
+		}
+	}
+	return std::make_pair(moveDist,moveAngle);
+
 }
 
 // n being a point somewhere
@@ -223,12 +292,25 @@ void moveStraight(double distance)
 
 // return next move in polar coordinates
 std::pair<double, double> getStrategyNextMove(
+	ALGORITHM algo,
 	double currentAngle,
 	std::tuple<double, double, double> sensorsDistance)
 {
 	double moveDist = 0;
 	double moveAngle = 0;
-	return std::make_pair(moveDist, moveAngle);
+	std::pair<double,double> nextMovement;
+
+	switch (algo)
+	{
+	case BUG2:
+		nextMovement = bug2(currentAngle,sensorsDistance);
+		break;
+
+	default:
+		break;
+	}
+
+	return nextMovement;
 }
 
 void recalculatePosition(double distance, double angle)
@@ -253,13 +335,13 @@ void opcontrol()
 		sensorsDistance = {ultraSonicLeft.get(), ultraSonicMiddle.get(), ultraSonicRight.get()};
 
 		// DEBUG
-		pros::lcd::print(0, "UltrasonicLeft %.2f mm", std::get<0>(sensorsDistance));
-		pros::lcd::print(1, "UltrasonicMiddle %.2f mm", std::get<1>(sensorsDistance));
-		pros::lcd::print(2, "UltrasonicRight %.2f mm", std::get<2>(sensorsDistance));
+		pros::lcd::print(0, "UltrasonicLeft %.2f mm", std::get<LEFT>(sensorsDistance));
+		pros::lcd::print(1, "UltrasonicMiddle %.2f mm", std::get<MIDDLE>(sensorsDistance));
+		pros::lcd::print(2, "UltrasonicRight %.2f mm", std::get<RIGHT>(sensorsDistance));
 		pros::lcd::print(3, "gyroscope %.2f degrees", currentAngle);
 		pros::lcd::print(4, "current pos %.2f %.2f", robotPosition.first, robotPosition.second);
 
-		nextMove = getStrategyNextMove(currentAngle, sensorsDistance);
+		nextMove = getStrategyNextMove(BUG2,currentAngle, sensorsDistance);
 		moveToAngle(currentAngle, nextMove.second, maxAngleError);
 		moveStraight(nextMove.first);
 		currentAngle = gyroscope.get();
