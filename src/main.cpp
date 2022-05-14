@@ -1,6 +1,5 @@
 #include "main.h"
 #include "okapi/api.hpp"
-#include <ctgmath>
 
 using namespace okapi;
 
@@ -29,6 +28,9 @@ using namespace okapi;
 #define WHEEL_DIAMETER 16_cm
 #define WHEEL_TRACK 43_cm
 
+#define X_TARGET 15
+#define Y_TARGET 25
+
 // sensors and actuators
 Controller controller;
 Motor motorFL = Motor(PORT_FL_WHEEL, WHEEL_DIRECTION_FL, WHEEL_GEARSET, WHEEL_ENCODER_UNIT);
@@ -41,75 +43,74 @@ ADIUltrasonic ultraSonicRight = ADIUltrasonic(PORT_SENSOR3_TRIGGER, PORT_SENSOR3
 IMU gyroscope = IMU(PORT_GYROSCOPE, okapi::IMUAxes::z);
 std::shared_ptr<ChassisController> drive;
 
-// Global position of the robot
-double xRobot;
-double yRobot;
+// Global position of the robot and the target
+std::pair<int, int> robotPosition(0, 0);
+std::pair<int, int> targetPosition(X_TARGET, Y_TARGET);
 
 // Bug 0 algorithm
 
-	// Same as bug0 except the robot moves around the WHOLE object and goes back to closest point from the goal
-	// Rotates towards the goal
-	// while not arrived
-	// Forward
-	// if obstacle encountered
-	// While not full loop around obstacle or not arrived
-	// Record position
-	// Compare to distance
-	// While < front threshold or < left threshold
-	// Rotate right
-	// Forward
-	// Go to closest position
+// Same as bug0 except the robot moves around the WHOLE object and goes back to closest point from the goal
+// Rotates towards the goal
+// while not arrived
+// Forward
+// if obstacle encountered
+// While not full loop around obstacle or not arrived
+// Record position
+// Compare to distance
+// While < front threshold or < left threshold
+// Rotate right
+// Forward
+// Go to closest position
 
+void bug2(double xGoal, double yGoal)
+{
+	// double dx = xGoal - xRobot;
+	// double dy = yGoal - yRobot;
+	// // 0 - 255 but result between 0. 1.0
+	// double teta = 255 * arctan2(dx,dy);
+	// double innerRotation = 0;
+	// double initX = xRobot;
+	// double initY = yRobot;
+	// double xHitPoint = 0;
+	// double yHitPoint = 0;
+	// // For the m-line equation
+	// double alphaLine = dy/dx;
+	// double betaLine = yGoal - (alphaLine*xGoal);
 
-void bug2(double xGoal, double yGoal){
-	double dx = xGoal - xRobot;
-	double dy = yGoal - yRobot;
-	// 0 - 255 but result between 0. 1.0
-	double teta = 255 * arctan2(dx,dy);
-	double innerRotation = 0;
-	double initX = xRobot;
-	double initY = yRobot;
-	double xHitPoint = 0;
-	double yHitPoint = 0;
-	// For the m-line equation
-	double alphaLine = dy/dx;
-	double betaLine = yGoal - (alphaLine*xGoal);
+	// // TODO -Increment position for each movement
+	// // Rotates towards goal
+	// moveToAngle(0, teta, 0.5);
+	// while (dx > 1 and dy > 1){ // while not arrived
 
-	// TODO -Increment position for each movement
-	// Rotates towards goal
-	moveToAngle(0, teta, 0.5);
-	while (dx > 1 and dy > 1){ // while not arrived
+	// 	// if obstacle encountered
+	// 	if (ultraSonicMiddle.get() < FRONT_THRESHOLD){
+	// 		// Memorize hitpoint
+	// 		xHitPoint = xRobot;
+	// 		yHitPoint = yRobot;
+	// 		// while not arrived and not m-line is re-encountered
+	// 		// aka find if xRobot yRobot are part of the line
+	// 		while((dx > 1) and (dy > 1) and (yRobot != xGoal*alphaLine + betaLine)){
+	// 			// Follow obstacle
+	// 			if (ultraSonicMiddle.get() < FRONT_THRESHOLD){
+	// 				// move right
+	// 				moveToAngle(0,45,0.5);
+	// 				innerRotation += 45;
+	// 			}else if (ultraSonicLeft.get() > LEFT_THRESHOLD){
+	// 				//move left
+	// 				moveToAngle(0,-45,0.5);
+	// 				innerRotation += -45;
+	// 			}else{
+	// 				moveStraight(50);
+	// 			}
 
-		// if obstacle encountered
-		if (ultraSonicMiddle.get() < FRONT_THRESHOLD){
-			// Memorize hitpoint
-			xHitPoint = xRobot;
-			yHitPoint = yRobot;
-			// while not arrived and not m-line is re-encountered
-			// aka find if xRobot yRobot are part of the line
-			while((dx > 1) and (dy > 1) and (yRobot != xGoal*alphaLine + betaLine)){
-				// Follow obstacle
-				if (ultraSonicMiddle.get() < FRONT_THRESHOLD){
-					// move right
-					moveToAngle(0,45,0.5);
-					innerRotation += 45;
-				}else if (ultraSonicLeft.get() > LEFT_THRESHOLD){
-					//move left
-					moveToAngle(0,-45,0.5);
-					innerRotation += -45;
-				}else{
-					moveStraight(50);
-				}
+	// 		}
+	// 		teta = 255 * arctan2(dx,dy) + innerRotation;
+	// 	}
+	// 	// Follow m-line -> straight line towards goal
+	// 	moveToAngle(0, teta, 0.5);
+	// 	moveStraight(100); // millimeters
 
-			}
-			teta = 255 * arctan2(dx,dy) + innerRotation;
-		}
-		// Follow m-line -> straight line towards goal
-		moveToAngle(0, teta, 0.5);
-		moveStraight(100); // millimeters
-
-	}
-
+	// }
 }
 
 // n being a point somewhere
@@ -196,9 +197,14 @@ void autonomous()
 
 void moveToAngle(double currentAngle, double desiredAngle, double precision)
 {
-	if (abs(currentAngle - desiredAngle) > precision)
+	double diff = desiredAngle - currentAngle;
+	while (diff < 0)
 	{
-		drive->turnAngle(QAngle(-(currentAngle - desiredAngle) * degree));
+		diff += 360;
+	}
+	if (abs(diff) > precision)
+	{
+		drive->turnAngle(QAngle(((int)(diff + 180) % 360 - 180) * degree));
 	}
 }
 
@@ -206,43 +212,59 @@ void moveToDistance(double currentDistance, double desiredDistance, double preci
 {
 	if (abs(currentDistance - desiredDistance) > precision)
 	{
-		drive->moveDistance((currentDistance - desiredDistance) * millimeter);
+		drive->moveDistance((currentDistance - desiredDistance) * centimeter);
 	}
 }
 
 void moveStraight(double distance)
 {
-	drive->moveDistance(distance * millimeter);
+	drive->moveDistance(distance * centimeter);
+}
+
+// return next move in polar coordinates
+std::pair<double, double> getStrategyNextMove(
+	double currentAngle,
+	std::tuple<double, double, double> sensorsDistance)
+{
+	double moveDist = 0;
+	double moveAngle = 0;
+	return std::make_pair(moveDist, moveAngle);
+}
+
+void recalculatePosition(std::pair<double, double> move)
+{
+	robotPosition.first += move.first * cos(move.second);
+	robotPosition.second += move.first * sin(move.second);
 }
 
 void opcontrol()
 {
 	bool execute = true;
 	double desiredAngle = 10;
-	double maxAngleError = 5;
+	double maxAngleError = 5.0;
 	double desiredDistance = 200;
 	double maxDistanceError = 10;
 	double currentAngle;
-	double leftDistance;
-	double middleDistance;
-	double rightDistance;
+	std::tuple<double, double, double> sensorsDistance;
+	std::pair<double, double> nextMove;
 
 	while (execute)
 	{
-		leftDistance = ultraSonicLeft.get();
-		middleDistance = ultraSonicMiddle.get();
-		rightDistance = ultraSonicRight.get();
 		currentAngle = gyroscope.get();
+		sensorsDistance = {ultraSonicLeft.get(), ultraSonicMiddle.get(), ultraSonicRight.get()};
 
 		// DEBUG
-		pros::lcd::print(0, "UltrasonicLeft %.2f mm", leftDistance);
-		pros::lcd::print(1, "UltrasonicMiddle %.2f mm", middleDistance);
-		pros::lcd::print(2, "UltrasonicRight %.2f mm", rightDistance);
+		pros::lcd::print(0, "UltrasonicLeft %.2f mm", std::get<0>(sensorsDistance));
+		pros::lcd::print(1, "UltrasonicMiddle %.2f mm", std::get<1>(sensorsDistance));
+		pros::lcd::print(2, "UltrasonicRight %.2f mm", std::get<2>(sensorsDistance));
 		pros::lcd::print(3, "gyroscope %.2f degrees", currentAngle);
+		pros::lcd::print(4, "current pos %.2f %.2f", robotPosition.first, robotPosition.second);
 
-		moveToAngle(currentAngle, desiredAngle, maxAngleError);
-		moveToDistance(middleDistance, desiredDistance, maxDistanceError);
-		moveStraight(10);
+		nextMove = getStrategyNextMove(currentAngle, sensorsDistance);
+		moveToAngle(currentAngle, nextMove.second, maxAngleError);
+		moveStraight(nextMove.first);
+		recalculatePosition(nextMove);
+		pros::lcd::print(5, "nextMove %.2f %.2f", nextMove.first, nextMove.second);
 
 		// Delay between iteraction
 		pros::delay(50);
