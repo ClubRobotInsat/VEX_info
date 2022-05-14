@@ -97,6 +97,9 @@ void initialize()
 	pros::delay(2000);
 	while (ultraSonicMiddle.get() == 0)
 		;
+	gyroscope.reset();
+	while(gyroscope.isCalibrating())
+		;
 }
 
 /**
