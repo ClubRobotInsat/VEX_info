@@ -62,6 +62,12 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+int radToMicro(float rad);
+int floatToInt(float input);
+double sin(int deg);
+double cos(int deg);
+double arccos(double num);
+double arctan2(float opp, float adj);
 void autonomous(void);
 void initialize(void);
 void disabled(void);
