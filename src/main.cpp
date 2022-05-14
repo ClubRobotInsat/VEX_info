@@ -25,16 +25,16 @@ using namespace okapi;
 #define WHEEL_ENCODER_UNIT AbstractMotor::encoderUnits::rotations
 
 // Proportions
-#define WHEEL_DIAMETER 10.2_cm*84/60
+#define WHEEL_DIAMETER 10.2_cm * 84 / 60
 #define WHEEL_TRACK 38_cm
 
-#define X_TARGET 100.0
-#define Y_TARGET 50.0
+#define X_TARGET 50.0
+#define Y_TARGET 100.0
 
 // Threshold for sensors
-#define FRONT_THRESHOLD 250
-#define LEFT_THRESHOLD 200
-#define RIGHT_THRESHOLD 200
+#define FRONT_THRESHOLD 30
+#define LEFT_THRESHOLD 30
+#define RIGHT_THRESHOLD 30
 
 // sensors and actuators
 Controller controller;
@@ -52,19 +52,19 @@ std::shared_ptr<ChassisController> drive;
 std::pair<double, double> robotPosition(0, 0);
 std::pair<double, double> targetPosition(X_TARGET, Y_TARGET);
 
-// Global variables for bug2 memory equations
-bool createdLine = false;
-double alphaLine = -1;
-double betaLine = -1;
-double foundObstacle = false;
-
 // Enum for next move algorithms
-enum ALGORITHM {
-	BUG0,BUG1,BUG2
+enum ALGORITHM
+{
+	BUG0,
+	BUG1,
+	BUG2
 };
 
-enum SENSORS{
-	LEFT,MIDDLE,RIGHT
+enum SENSORS
+{
+	LEFT,
+	MIDDLE,
+	RIGHT
 };
 
 // std::pair<double,double> bug0(double currentAngle, std::tuple<double, double, double> sensorsDistance){
@@ -126,60 +126,74 @@ enum SENSORS{
 // }
 
 // Switch with angle instead of position
-std::pair<double,double> bug2(double currentAngle, std::tuple<double, double, double> sensorsDistance){
+// TODO - Add hitpoint comparation
+
+// Global variables for bug2 memory equations
+bool createdLine = false;
+double alphaLine = -1;
+double betaLine = -1;
+double foundObstacle = false;
+
+std::pair<double, double> bug2(double currentAngle, std::tuple<double, double, double> sensorsDistance)
+{
 	double dx = targetPosition.first - robotPosition.first;
 	double dy = targetPosition.second - robotPosition.second;
 	// Target - Position
-	double teta = atan2(targetPosition.second,targetPosition.first)*360/(2*PI)-currentAngle;
+	double teta = currentAngle + 90 - atan2(dy, dx) * 360 / (2 * PI);
 	double innerRotation = 0;
-	double initX = robotPosition.first;
-	double initY = robotPosition.second;
-	double xHitPoint = 0;
-	double yHitPoint = 0;
 	double moveDist = 0;
 	double moveAngle = 0;
 
 	// Obstacle following mode
 	if (foundObstacle)
 	{
-		// if we cross m-line rotate towards goal
-		if (targetPosition.second == (targetPosition.first*alphaLine + betaLine))
+
+		if (std::get<LEFT>(sensorsDistance) < LEFT_THRESHOLD || std::get<MIDDLE>(sensorsDistance) < FRONT_THRESHOLD) // too close from the obstacle
 		{
-			if(targetPosition.first > robotPosition.first){
-				moveAngle = 180-atan2(dy,dx)*360/(2*PI);
-			}else{
-				moveAngle = atan2(dy,dx)*360/(2*PI);
-			}
+			moveAngle = currentAngle + 10;
+		}
+		else if (std::get<LEFT>(sensorsDistance) > LEFT_THRESHOLD) // Too far from obstacle
+		{
+			moveAngle = currentAngle - 10;
+		}
+		else
+		{
+			moveDist = 5;
+			moveAngle = currentAngle;
+		}
+
+		if (robotPosition.second >= (robotPosition.first * alphaLine + betaLine))
+		{
+			moveAngle = teta;
+			moveDist = 5;
 			// Quit obstacle
 			foundObstacle = false;
-		}else if (std::get<LEFT>(sensorsDistance) < LEFT_THRESHOLD or std::get<MIDDLE>(sensorsDistance) < FRONT_THRESHOLD) // too close from the obstacle
-		{
-			moveAngle = 10;
-		}else if (std::get<LEFT>(sensorsDistance) > LEFT_THRESHOLD) // Too far from obstacle
-		{
-			moveAngle = -10;
-		}else{
-			moveDist = 5;
 		}
-
-	} else // Normal mode
-	{
-		if (!createdLine) // Create m-line to follow
-		{
-			alphaLine = dy/dx;
-			betaLine = targetPosition.second - (alphaLine*targetPosition.first);
-			// Rotate towards target
-			moveAngle = teta;
-			createdLine = true;
-		}else if (std::get<MIDDLE>(sensorsDistance) < FRONT_THRESHOLD) // Encountered obstacle
-		{
-			foundObstacle = true;
-		}else{
-			moveDist = 15;
-		}
+		return std::make_pair(moveDist, moveAngle);
 	}
-	return std::make_pair(moveDist,moveAngle);
 
+	// Normal mode
+
+	if (!createdLine) // Create m-line to follow
+	{
+		alphaLine = dy / dx;
+		betaLine = targetPosition.second - (alphaLine * targetPosition.first);
+		// Rotate towards target
+		moveAngle = teta;
+		createdLine = true;
+	}
+
+	if (std::get<MIDDLE>(sensorsDistance) < FRONT_THRESHOLD) // Encountered obstacle
+	{
+		foundObstacle = true;
+		moveAngle = currentAngle + 45;
+	}
+	else
+	{
+		moveDist = 15;
+	}
+
+	return std::make_pair(moveDist, moveAngle);
 }
 
 // n being a point somewhere
@@ -298,12 +312,12 @@ std::pair<double, double> getStrategyNextMove(
 {
 	double moveDist = 0;
 	double moveAngle = 0;
-	std::pair<double,double> nextMovement;
+	std::pair<double, double> nextMovement;
 
 	switch (algo)
 	{
 	case BUG2:
-		nextMovement = bug2(currentAngle,sensorsDistance);
+		nextMovement = bug2(currentAngle, sensorsDistance);
 		break;
 
 	default:
@@ -315,8 +329,8 @@ std::pair<double, double> getStrategyNextMove(
 
 void recalculatePosition(double distance, double angle)
 {
-	robotPosition.first += distance * sin(angle*2*PI/360);
-	robotPosition.second += distance * cos(angle*2*PI/360);
+	robotPosition.first += distance * sin(angle * 2 * PI / 360);
+	robotPosition.second += distance * cos(angle * 2 * PI / 360);
 }
 
 void opcontrol()
@@ -328,7 +342,7 @@ void opcontrol()
 	double maxDistanceError = 10;
 	double currentAngle = 0;
 	std::tuple<double, double, double> sensorsDistance;
-	std::pair<double, double> nextMove(0,0);
+	std::pair<double, double> nextMove(0, 0);
 
 	while (execute)
 	{
@@ -341,13 +355,13 @@ void opcontrol()
 		pros::lcd::print(3, "gyroscope %.2f degrees", currentAngle);
 		pros::lcd::print(4, "current pos %.2f %.2f", robotPosition.first, robotPosition.second);
 
-		nextMove = getStrategyNextMove(BUG2,currentAngle, sensorsDistance);
+		nextMove = getStrategyNextMove(BUG2, currentAngle, sensorsDistance);
 		moveToAngle(currentAngle, nextMove.second, maxAngleError);
 		moveStraight(nextMove.first);
 		currentAngle = gyroscope.get();
 		recalculatePosition(nextMove.first, currentAngle);
 
 		// Delay between iteraction
-		pros::delay(50);
+		pros::delay(1000);
 	}
 }
