@@ -33,7 +33,7 @@ using namespace okapi;
 
 // Threshold for sensors
 #define FRONT_THRESHOLD 300
-#define LEFT_INFERIOR_THRESHOLD 300
+#define LEFT_INFERIOR_THRESHOLD 200
 #define LEFT_SUPERIOR_THRESHOLD 400
 #define RIGHT_THRESHOLD 400
 
@@ -146,7 +146,7 @@ std::pair<double, double> bug2(double currentAngle, std::tuple<double, double, d
 	double moveAngle = 0;
 	std::pair<double,double> hitPoint;
 
-	if (abs(dx) < 5 && abs(dy) < 5){
+	if (abs(dx) < 50 && abs(dy) < 50){
 		return std::make_pair(0,currentAngle);
 	}
 
@@ -155,19 +155,19 @@ std::pair<double, double> bug2(double currentAngle, std::tuple<double, double, d
 	{
 		if ( std::get<LEFT>(sensorsDistance)-LEFT_INFERIOR_THRESHOLD < 5 || std::get<MIDDLE>(sensorsDistance) - FRONT_THRESHOLD < 5) // too close from the obstacle
 		{
-			moveAngle = currentAngle + 35;
+			moveAngle = currentAngle + 45;
 			pros::lcd::print(5, "Too close");
 		}
-		else if (std::get<LEFT>(sensorsDistance)-LEFT_INFERIOR_THRESHOLD < 10 && std::get<MIDDLE>(sensorsDistance) - FRONT_THRESHOLD > -5) // too close from the obstacle
+		else if (LEFT_INFERIOR_THRESHOLD < std::get<LEFT>(sensorsDistance) && std::get<LEFT>(sensorsDistance) < LEFT_SUPERIOR_THRESHOLD && std::get<MIDDLE>(sensorsDistance) - FRONT_THRESHOLD > -5) // too close from the obstacle
 		{
 			moveAngle = currentAngle;
 			moveDist = 50;
 			pros::lcd::print(5, "a cote");
 		}
-		else if (std::get<LEFT>(sensorsDistance)-LEFT_SUPERIOR_THRESHOLD > -5) // Too far from obstacle
+		else if (std::get<LEFT>(sensorsDistance) > LEFT_SUPERIOR_THRESHOLD ) // Too far from obstacle
 		{
 			pros::lcd::print(5, "Too far");
-			moveAngle = currentAngle - 35;
+			moveAngle = currentAngle - 15;
 		}
 		else
 		{
