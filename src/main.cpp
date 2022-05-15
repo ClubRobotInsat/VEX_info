@@ -223,7 +223,7 @@ void initialize()
 	drive = ChassisControllerBuilder()
 				.withMotors(motorFL, motorFR, motorBR, motorBL)
 				.withDimensions(WHEEL_GEARSET, {{WHEEL_DIAMETER, WHEEL_TRACK}, imev5GreenTPR})
-				.withGains({1, 0, 0, 0}, {1, 0, 0, 0})
+				.withGains({0.001, 0.001, 0.00001}, {0, 0, 0, 0})
 				.build();
 	pros::delay(2000);
 	while (ultraSonicMiddle.get() == 0)
@@ -308,9 +308,28 @@ void moveStraight(double distance)
 
 int sequenceCount = 0;
 std::vector<std::pair<double, double>> sequence = {
-	std::make_pair(10, 0),
-	std::make_pair(10, 90),
-	std::make_pair(10, 0),
+	std::make_pair(500, 0),
+	std::make_pair(-500, 0),
+	std::make_pair(500, 0),
+	std::make_pair(-500, 0),
+	// std::make_pair(500, 0),
+	// std::make_pair(-500, 0),
+	// std::make_pair(500, 0),
+	// std::make_pair(-500, 0),
+	// std::make_pair(500, 0),
+	// std::make_pair(-500, 0),
+	// std::make_pair(500, 0),
+	// std::make_pair(-500, 0),
+	// std::make_pair(500, 0),
+	// std::make_pair(-500, 0),
+	// std::make_pair(500, 0),
+	// std::make_pair(-500, 0),
+	// std::make_pair(500, 0),
+	// std::make_pair(-500, 0),
+	// std::make_pair(500, 0),
+	// std::make_pair(-500, 0),
+	// std::make_pair(500, 0),
+	// std::make_pair(-500, 0),
 };
 
 // return next move in polar coordinates
@@ -327,7 +346,7 @@ std::pair<double, double> getStrategyNextMove(
 	{
 	case SEQUENCE:
 		nextMovement =
-			sequenceCount > sequence.size() ? sequence[sequenceCount++] : std::make_pair(0.0, currentAngle);
+			sequenceCount <= sequence.size() ? sequence[sequenceCount++] : std::make_pair(0.0, currentAngle);
 		break;
 	case BUG0:
 		nextMovement = bug0(currentAngle, sensorsDistance);
@@ -371,13 +390,13 @@ void opcontrol()
 		pros::lcd::print(3, "gyroscope %.2f degrees", currentAngle);
 		pros::lcd::print(4, "current pos %.2f %.2f", robotPosition.first, robotPosition.second);
 
-		nextMove = getStrategyNextMove(BUG0, currentAngle, sensorsDistance);
+		nextMove = getStrategyNextMove(SEQUENCE, currentAngle, sensorsDistance);
 		moveToAngle(currentAngle, nextMove.second, maxAngleError);
 		moveStraight(nextMove.first);
 		currentAngle = gyroscope.get();
 		recalculatePosition(nextMove.first, currentAngle);
 
 		// Delay between iteraction
-		pros::delay(2000);
+		pros::delay(100);
 	}
 }
