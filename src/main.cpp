@@ -25,16 +25,17 @@ using namespace okapi;
 #define WHEEL_ENCODER_UNIT AbstractMotor::encoderUnits::rotations
 
 // Proportions
-#define WHEEL_DIAMETER 10.2_cm * 84 / 60
-#define WHEEL_TRACK 38_cm
+#define WHEEL_DIAMETER 102_mm * 84 / 60
+#define WHEEL_TRACK 380_mm
 
-#define X_TARGET 50.0
-#define Y_TARGET 100.0
+#define X_TARGET 200
+#define Y_TARGET 500
 
 // Threshold for sensors
-#define FRONT_THRESHOLD 30
-#define LEFT_THRESHOLD 30
-#define RIGHT_THRESHOLD 30
+#define FRONT_THRESHOLD 300
+#define LEFT_INFERIOR_THRESHOLD 300
+#define LEFT_SUPERIOR_THRESHOLD 400
+#define RIGHT_THRESHOLD 400
 
 // sensors and actuators
 Controller controller;
@@ -133,41 +134,56 @@ bool createdLine = false;
 double alphaLine = -1;
 double betaLine = -1;
 double foundObstacle = false;
+bool firstEncounter = true;
 
 std::pair<double, double> bug2(double currentAngle, std::tuple<double, double, double> sensorsDistance)
 {
 	double dx = targetPosition.first - robotPosition.first;
 	double dy = targetPosition.second - robotPosition.second;
 	// Target - Position
-	double teta = currentAngle + 90 - atan2(dy, dx) * 360 / (2 * PI);
-	double innerRotation = 0;
+	double teta = 90 - atan2(dy, dx) * 360 / (2 * PI);
 	double moveDist = 0;
 	double moveAngle = 0;
+	std::pair<double,double> hitPoint;
+
+	if (abs(dx) < 5 && abs(dy) < 5){
+		return std::make_pair(0,currentAngle);
+	}
 
 	// Obstacle following mode
 	if (foundObstacle)
 	{
-
-		if (std::get<LEFT>(sensorsDistance) < LEFT_THRESHOLD || std::get<MIDDLE>(sensorsDistance) < FRONT_THRESHOLD) // too close from the obstacle
+		if ( std::get<LEFT>(sensorsDistance)-LEFT_INFERIOR_THRESHOLD < 5 || std::get<MIDDLE>(sensorsDistance) - FRONT_THRESHOLD < 5) // too close from the obstacle
 		{
-			moveAngle = currentAngle + 10;
+			moveAngle = currentAngle + 35;
+			pros::lcd::print(5, "Too close");
 		}
-		else if (std::get<LEFT>(sensorsDistance) > LEFT_THRESHOLD) // Too far from obstacle
+		else if (std::get<LEFT>(sensorsDistance)-LEFT_INFERIOR_THRESHOLD < 10 && std::get<MIDDLE>(sensorsDistance) - FRONT_THRESHOLD > -5) // too close from the obstacle
 		{
-			moveAngle = currentAngle - 10;
+			moveAngle = currentAngle;
+			moveDist = 50;
+			pros::lcd::print(5, "a cote");
+		}
+		else if (std::get<LEFT>(sensorsDistance)-LEFT_SUPERIOR_THRESHOLD > -5) // Too far from obstacle
+		{
+			pros::lcd::print(5, "Too far");
+			moveAngle = currentAngle - 35;
 		}
 		else
 		{
-			moveDist = 5;
+			pros::lcd::print(5, "RAS");
+			moveDist = 50;
 			moveAngle = currentAngle;
 		}
 
-		if (robotPosition.second >= (robotPosition.first * alphaLine + betaLine))
+		if ((robotPosition.second - (robotPosition.first * alphaLine + betaLine) >= 5) && !firstEncounter)
 		{
+			pros::lcd::print(5, "Encountered Line");
 			moveAngle = teta;
-			moveDist = 5;
+			moveDist = 50;
 			// Quit obstacle
 			foundObstacle = false;
+			firstEncounter = true;
 		}
 		return std::make_pair(moveDist, moveAngle);
 	}
@@ -176,6 +192,7 @@ std::pair<double, double> bug2(double currentAngle, std::tuple<double, double, d
 
 	if (!createdLine) // Create m-line to follow
 	{
+		pros::lcd::print(5, "Creating Line");
 		alphaLine = dy / dx;
 		betaLine = targetPosition.second - (alphaLine * targetPosition.first);
 		// Rotate towards target
@@ -185,12 +202,18 @@ std::pair<double, double> bug2(double currentAngle, std::tuple<double, double, d
 
 	if (std::get<MIDDLE>(sensorsDistance) < FRONT_THRESHOLD) // Encountered obstacle
 	{
+		pros::lcd::print(5, "Encountered obstacle");
 		foundObstacle = true;
-		moveAngle = currentAngle + 45;
+		moveAngle = currentAngle + 10;
+		hitPoint = robotPosition;
+		firstEncounter = true;
 	}
 	else
 	{
-		moveDist = 15;
+		pros::lcd::print(5, "Nothing in front");
+		pros::lcd::print(6, "teta : %.2f",teta);
+		moveAngle = teta;
+		moveDist = 50;
 	}
 
 	return std::make_pair(moveDist, moveAngle);
@@ -295,13 +318,13 @@ void moveToDistance(double currentDistance, double desiredDistance, double preci
 {
 	if (abs(currentDistance - desiredDistance) > precision)
 	{
-		drive->moveDistance((currentDistance - desiredDistance) * centimeter);
+		drive->moveDistance((currentDistance - desiredDistance) * millimeter);
 	}
 }
 
 void moveStraight(double distance)
 {
-	drive->moveDistance(distance * centimeter);
+	drive->moveDistance(distance * millimeter);
 }
 
 // return next move in polar coordinates
@@ -362,6 +385,6 @@ void opcontrol()
 		recalculatePosition(nextMove.first, currentAngle);
 
 		// Delay between iteraction
-		pros::delay(1000);
+		pros::delay(2000);
 	}
 }
