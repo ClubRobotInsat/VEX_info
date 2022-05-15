@@ -133,8 +133,75 @@ enum SENSORS
 bool createdLine = false;
 double alphaLine = -1;
 double betaLine = -1;
-double foundObstacle = false;
+double foundObstacle = false; // WARNING - double or bool??
+double bypassed = false;
 bool firstEncounter = true;
+
+std::pair<double, double> bug1(double currentAngle, std::tuple<double, double, double> sensorsDistance) {
+	double dx = targetPosition.first - robotPosition.first;
+	double dy = targetPosition.second - robotPosition.second;
+	// Target - Position
+	double teta = 90 - atan2(dy, dx) * 360 / (2 * PI);
+	double moveDist = 0;
+	double moveAngle = 0;
+	std::pair<double,double> hitPoint;
+
+	if (abs(dx) < 50 && abs(dy) < 50){
+		return std::make_pair(0,currentAngle);
+	}
+
+	// Obstacle first encountered => get around
+	if (foundObstacle && !bypassed) {
+		// Coordinates of the closest point to the target next to the obstacle
+		std::pair<double,double> min(10000, 10000);
+
+		if ( std::get<LEFT>(sensorsDistance)-LEFT_INFERIOR_THRESHOLD < 5 || std::get<MIDDLE>(sensorsDistance) - FRONT_THRESHOLD < 5) // too close from the obstacle
+		{
+			moveAngle = currentAngle + 45;
+			pros::lcd::print(5, "Too close");
+		}
+		else if (LEFT_INFERIOR_THRESHOLD < std::get<LEFT>(sensorsDistance) && std::get<LEFT>(sensorsDistance) < LEFT_SUPERIOR_THRESHOLD && std::get<MIDDLE>(sensorsDistance) - FRONT_THRESHOLD > -5) // too close from the obstacle
+		{
+			moveAngle = currentAngle;
+			moveDist = 50;
+			pros::lcd::print(5, "a cote");
+		}
+		else if (std::get<LEFT>(sensorsDistance) > LEFT_SUPERIOR_THRESHOLD ) // Too far from obstacle
+		{
+			pros::lcd::print(5, "Too far");
+			moveAngle = currentAngle - 15;
+		}
+		else
+		{
+			pros::lcd::print(5, "RAS");
+			moveDist = 50;
+			moveAngle = currentAngle;
+
+			// TODO - vérifier le calcul du nouveau minimum
+			if (dx<min.first && dy<min.second) {
+				
+			}
+		}
+	}
+
+	if (std::get<MIDDLE>(sensorsDistance) < FRONT_THRESHOLD) // Encountered obstacle
+	{
+		pros::lcd::print(5, "Encountered obstacle");
+		foundObstacle = true;
+		moveAngle = currentAngle + 10;
+		hitPoint = robotPosition;
+		firstEncounter = true;
+	}
+	else
+	{
+		pros::lcd::print(5, "Nothing in front");
+		pros::lcd::print(6, "teta : %.2f",teta);
+		moveAngle = teta;
+		moveDist = 50;
+	}
+
+	return std::make_pair(moveDist, moveAngle);
+}
 
 std::pair<double, double> bug2(double currentAngle, std::tuple<double, double, double> sensorsDistance)
 {
