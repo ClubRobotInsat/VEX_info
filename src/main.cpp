@@ -39,6 +39,11 @@ using namespace okapi;
 #define LEFT_SUPERIOR_THRESHOLD 400
 #define RIGHT_THRESHOLD 400
 
+#define MOVEMENT_ALGO SEQUENCE
+
+#define RAD_TO_DEGREES(r) r * 360 / (2 * PI)
+#define DEGREES_TO_RAD(r) r * 2 * PI / 360
+
 // sensors and actuators
 Controller controller;
 Motor motorFL = Motor(PORT_FL_WHEEL, WHEEL_DIRECTION_FL, WHEEL_GEARSET, WHEEL_ENCODER_UNIT);
@@ -75,7 +80,7 @@ std::pair<double, double> bug0(double currentAngle, std::tuple<double, double, d
 {
 	double dx = targetPosition.first - robotPosition.first;
 	double dy = targetPosition.second - robotPosition.second;
-	double teta = 90 - atan2(dy, dx) * 360 / (2 * PI);
+	double teta = 90 - RAD_TO_DEGREES(atan2(dy, dx));
 	double moveDist = 0;
 	double moveAngle = 0;
 	std::pair<double, double> hitPoint;
@@ -118,7 +123,7 @@ std::pair<double, double> bug2(double currentAngle, std::tuple<double, double, d
 	double dx = targetPosition.first - robotPosition.first;
 	double dy = targetPosition.second - robotPosition.second;
 	// Target - Position
-	double teta = 90 - atan2(dy, dx) * 360 / (2 * PI);
+	double teta = 90 - RAD_TO_DEGREES(atan2(dy, dx));
 	double moveDist = 0;
 	double moveAngle = 0;
 	std::pair<double, double> hitPoint;
@@ -223,7 +228,7 @@ void initialize()
 	drive = ChassisControllerBuilder()
 				.withMotors(motorFL, motorFR, motorBR, motorBL)
 				.withDimensions(WHEEL_GEARSET, {{WHEEL_DIAMETER, WHEEL_TRACK}, imev5GreenTPR})
-				.withGains({0.001, 0.001, 0.00001}, {0, 0, 0, 0})
+				// .withGains({0.001, 0, 0.0001}, {0.001, 0, 0.0001})
 				.build();
 	pros::delay(2000);
 	while (ultraSonicMiddle.get() == 0)
@@ -265,20 +270,6 @@ void competition_initialize() {}
 void autonomous()
 {
 }
-
-/**
- * Runs the operator control code. This function will be started in its own task
- * with the default priority and stack size whenever the robot is enabled via
- * the Field Management System or the VEX Competition Switch in the operator
- * control mode.
- *
- * If no competition control is connected, this function will run immediately
- * following initialize().
- *
- * If the robot is disabled or communications is lost, the
- * operator control task will be stopped. Re-enabling the robot will restart the
- * task, not resume it from where it left off.
- */
 
 void moveToAngle(double currentAngle, double desiredAngle, double precision)
 {
@@ -364,10 +355,23 @@ std::pair<double, double> getStrategyNextMove(
 
 void recalculatePosition(double distance, double angle)
 {
-	robotPosition.first += distance * sin(angle * 2 * PI / 360);
-	robotPosition.second += distance * cos(angle * 2 * PI / 360);
+	robotPosition.first += distance * sin(DEGREES_TO_RAD(angle));
+	robotPosition.second += distance * cos(DEGREES_TO_RAD(angle));
 }
 
+/**
+ * Runs the operator control code. This function will be started in its own task
+ * with the default priority and stack size whenever the robot is enabled via
+ * the Field Management System or the VEX Competition Switch in the operator
+ * control mode.
+ *
+ * If no competition control is connected, this function will run immediately
+ * following initialize().
+ *
+ * If the robot is disabled or communications is lost, the
+ * operator control task will be stopped. Re-enabling the robot will restart the
+ * task, not resume it from where it left off.
+ */
 void opcontrol()
 {
 	bool execute = true;
@@ -390,7 +394,7 @@ void opcontrol()
 		pros::lcd::print(3, "gyroscope %.2f degrees", currentAngle);
 		pros::lcd::print(4, "current pos %.2f %.2f", robotPosition.first, robotPosition.second);
 
-		nextMove = getStrategyNextMove(SEQUENCE, currentAngle, sensorsDistance);
+		nextMove = getStrategyNextMove(MOVEMENT_ALGO, currentAngle, sensorsDistance);
 		moveToAngle(currentAngle, nextMove.second, maxAngleError);
 		moveStraight(nextMove.first);
 		currentAngle = gyroscope.get();
