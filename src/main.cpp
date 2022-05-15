@@ -32,6 +32,8 @@ using namespace okapi;
 #define Y_TARGET 500
 
 // Threshold for sensors
+#define SENSOR_THRESHOLD 250
+#define CRITICAL_SENSOR_THRESHOLD 100
 #define FRONT_THRESHOLD 300
 #define LEFT_INFERIOR_THRESHOLD 300
 #define LEFT_SUPERIOR_THRESHOLD 400
@@ -56,6 +58,7 @@ std::pair<double, double> targetPosition(X_TARGET, Y_TARGET);
 // Enum for next move algorithms
 enum ALGORITHM
 {
+	SEQUENCE,
 	BUG0,
 	BUG1,
 	BUG2
@@ -68,66 +71,40 @@ enum SENSORS
 	RIGHT
 };
 
-// std::pair<double,double> bug0(double currentAngle, std::tuple<double, double, double> sensorsDistance){
-// 	double dx = targetPosition.first - robotPosition.first;
-// 	double dy = targetPosition.second - robotPosition.second;
-// 	// 0 - 255 but result between 0. 1.0
-// 	double teta = atan2(targetPosition.second,targetPosition.first)-currentAngle;
-// 	double innerRotation = 0;
-// 	double initX = robotPosition.first;
-// 	double initY = robotPosition.second;
-// 	double xHitPoint = 0;
-// 	double yHitPoint = 0;
-// 	double moveDist = 50;
-// 	double moveAngle = 0;
+std::pair<double, double> bug0(double currentAngle, std::tuple<double, double, double> sensorsDistance)
+{
+	double dx = targetPosition.first - robotPosition.first;
+	double dy = targetPosition.second - robotPosition.second;
+	double teta = 90 - atan2(dy, dx) * 360 / (2 * PI);
+	double moveDist = 0;
+	double moveAngle = 0;
+	std::pair<double, double> hitPoint;
 
-// 	if (std::get<LEFT>(sensorsDistance) < LEFT_THRESHOLD)
-// 	{
-// 		moveAngle = teta;
-// 		moveDist = 0;
-// 	}
-// 	if (std::get<MIDDLE>(sensorsDistance) < FRONT_THRESHOLD){
-// 		moveAngle = 45;
-// 	}
-// 	if (std::get<LEFT>(sensorsDistance)< FRONT_THRESHOLD){
+	if (abs(dx) < 50 && abs(dy) < 50)
+	{
+		return std::make_pair(0, currentAngle);
+	}
 
-// 		if (ultraSonicMiddle.get() < FRONT_THRESHOLD){ // if obstacle encountered (< front threshold)
-// 			// Rotate right big
-// 			moveToAngle(0.0, 90.0, 5.0);
-// 			// Modify increment
-// 			innerRotation += 45;
-// 			while((ultraSonicLeft.get() < LEFT_NO_OBSTACLE) && (ultraSonicMiddle.get() > FRONT_THRESHOLD) && (dx > 1) && (dy >1)){
-// 				// Forward
-// 				moveStraight(50.0);
-// 				// Modify increment
-// 				// TODO - Update position
-// 				if (ultraSonicLeft.get()<LEFT_THRESHOLD){
-// 					while(ultraSonicLeft.get()<LEFT_THRESHOLD){
-// 						// Rotate right
-// 						moveToAngle(0.0, 5.0, 0.5);
-// 						// Modify rotation increment
-// 						innerRotation += 5.0;
-// 					}
-// 				}
+	if (std::get<MIDDLE>(sensorsDistance) < SENSOR_THRESHOLD || std::get<LEFT>(sensorsDistance) < CRITICAL_SENSOR_THRESHOLD)
+	{
+		moveAngle = currentAngle + 45;
+		pros::lcd::print(5, "too close");
+	}
+	else if (std::get<MIDDLE>(sensorsDistance) > SENSOR_THRESHOLD && std::get<LEFT>(sensorsDistance) < SENSOR_THRESHOLD)
+	{
+		moveAngle = currentAngle;
+		moveDist = 50;
+		pros::lcd::print(5, "a cote");
+	}
+	else
+	{
+		moveAngle = teta;
+		moveDist = 50;
+		pros::lcd::print(5, "going ahead");
+	}
 
-// 			}
-
-// 		}else{
-// 			teta = 256 * arctan2(dx,dy) + innerRotation;
-// 			// Rotates towards goal
-// 			moveToAngle(0.0, teta, 0.5);
-// 			// Forward
-// 			moveStraight(50.0);
-// 			// Modify increment
-// 			// TODO - Update position
-// 		}
-
-// 	}
-
-// }
-
-// Switch with angle instead of position
-// TODO - Add hitpoint comparation
+	return std::make_pair(moveDist, moveAngle);
+}
 
 // Global variables for bug2 memory equations
 bool createdLine = false;
@@ -144,27 +121,28 @@ std::pair<double, double> bug2(double currentAngle, std::tuple<double, double, d
 	double teta = 90 - atan2(dy, dx) * 360 / (2 * PI);
 	double moveDist = 0;
 	double moveAngle = 0;
-	std::pair<double,double> hitPoint;
+	std::pair<double, double> hitPoint;
 
-	if (abs(dx) < 5 && abs(dy) < 5){
-		return std::make_pair(0,currentAngle);
+	if (abs(dx) < 5 && abs(dy) < 5)
+	{
+		return std::make_pair(0, currentAngle);
 	}
 
 	// Obstacle following mode
 	if (foundObstacle)
 	{
-		if ( std::get<LEFT>(sensorsDistance)-LEFT_INFERIOR_THRESHOLD < 5 || std::get<MIDDLE>(sensorsDistance) - FRONT_THRESHOLD < 5) // too close from the obstacle
+		if (std::get<LEFT>(sensorsDistance) - LEFT_INFERIOR_THRESHOLD < 5 || std::get<MIDDLE>(sensorsDistance) - FRONT_THRESHOLD < 5) // too close from the obstacle
 		{
 			moveAngle = currentAngle + 35;
 			pros::lcd::print(5, "Too close");
 		}
-		else if (std::get<LEFT>(sensorsDistance)-LEFT_INFERIOR_THRESHOLD < 10 && std::get<MIDDLE>(sensorsDistance) - FRONT_THRESHOLD > -5) // too close from the obstacle
+		else if (std::get<LEFT>(sensorsDistance) - LEFT_INFERIOR_THRESHOLD < 10 && std::get<MIDDLE>(sensorsDistance) - FRONT_THRESHOLD > -5) // too close from the obstacle
 		{
 			moveAngle = currentAngle;
 			moveDist = 50;
 			pros::lcd::print(5, "a cote");
 		}
-		else if (std::get<LEFT>(sensorsDistance)-LEFT_SUPERIOR_THRESHOLD > -5) // Too far from obstacle
+		else if (std::get<LEFT>(sensorsDistance) - LEFT_SUPERIOR_THRESHOLD > -5) // Too far from obstacle
 		{
 			pros::lcd::print(5, "Too far");
 			moveAngle = currentAngle - 35;
@@ -211,7 +189,7 @@ std::pair<double, double> bug2(double currentAngle, std::tuple<double, double, d
 	else
 	{
 		pros::lcd::print(5, "Nothing in front");
-		pros::lcd::print(6, "teta : %.2f",teta);
+		pros::lcd::print(6, "teta : %.2f", teta);
 		moveAngle = teta;
 		moveDist = 50;
 	}
@@ -245,6 +223,7 @@ void initialize()
 	drive = ChassisControllerBuilder()
 				.withMotors(motorFL, motorFR, motorBR, motorBL)
 				.withDimensions(WHEEL_GEARSET, {{WHEEL_DIAMETER, WHEEL_TRACK}, imev5GreenTPR})
+				.withGains({1, 0, 0, 0}, {1, 0, 0, 0})
 				.build();
 	pros::delay(2000);
 	while (ultraSonicMiddle.get() == 0)
@@ -327,6 +306,13 @@ void moveStraight(double distance)
 	drive->moveDistance(distance * millimeter);
 }
 
+int sequenceCount = 0;
+std::vector<std::pair<double, double>> sequence = {
+	std::make_pair(10, 0),
+	std::make_pair(10, 90),
+	std::make_pair(10, 0),
+};
+
 // return next move in polar coordinates
 std::pair<double, double> getStrategyNextMove(
 	ALGORITHM algo,
@@ -339,11 +325,18 @@ std::pair<double, double> getStrategyNextMove(
 
 	switch (algo)
 	{
+	case SEQUENCE:
+		nextMovement =
+			sequenceCount > sequence.size() ? sequence[sequenceCount++] : std::make_pair(0.0, currentAngle);
+		break;
+	case BUG0:
+		nextMovement = bug0(currentAngle, sensorsDistance);
+		break;
 	case BUG2:
 		nextMovement = bug2(currentAngle, sensorsDistance);
 		break;
-
 	default:
+		nextMovement = std::make_pair(0.0, currentAngle);
 		break;
 	}
 
@@ -378,7 +371,7 @@ void opcontrol()
 		pros::lcd::print(3, "gyroscope %.2f degrees", currentAngle);
 		pros::lcd::print(4, "current pos %.2f %.2f", robotPosition.first, robotPosition.second);
 
-		nextMove = getStrategyNextMove(BUG2, currentAngle, sensorsDistance);
+		nextMove = getStrategyNextMove(BUG0, currentAngle, sensorsDistance);
 		moveToAngle(currentAngle, nextMove.second, maxAngleError);
 		moveStraight(nextMove.first);
 		currentAngle = gyroscope.get();
