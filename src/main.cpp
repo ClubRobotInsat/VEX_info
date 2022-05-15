@@ -37,6 +37,10 @@ using namespace okapi;
 #define LEFT_SUPERIOR_THRESHOLD 400
 #define RIGHT_THRESHOLD 400
 
+
+
+
+
 // sensors and actuators
 Controller controller;
 Motor motorFL = Motor(PORT_FL_WHEEL, WHEEL_DIRECTION_FL, WHEEL_GEARSET, WHEEL_ENCODER_UNIT);
@@ -136,6 +140,8 @@ double betaLine = -1;
 double foundObstacle = false; // WARNING - double or bool??
 double bypassed = false;
 bool firstEncounter = true;
+// Coordinates of the closest point to the target next to the obstacle
+std::pair<double,double> min(10000, 10000);
 
 std::pair<double, double> bug1(double currentAngle, std::tuple<double, double, double> sensorsDistance) {
 	double dx = targetPosition.first - robotPosition.first;
@@ -152,8 +158,6 @@ std::pair<double, double> bug1(double currentAngle, std::tuple<double, double, d
 
 	// Obstacle first encountered => get around
 	if (foundObstacle && !bypassed) {
-		// Coordinates of the closest point to the target next to the obstacle
-		std::pair<double,double> min(10000, 10000);
 
 		if ( std::get<LEFT>(sensorsDistance)-LEFT_INFERIOR_THRESHOLD < 5 || std::get<MIDDLE>(sensorsDistance) - FRONT_THRESHOLD < 5) // too close from the obstacle
 		{
@@ -179,9 +183,52 @@ std::pair<double, double> bug1(double currentAngle, std::tuple<double, double, d
 
 			// TODO - vérifier le calcul du nouveau minimum
 			if (dx<min.first && dy<min.second) {
-				
+				min = robotPosition;
 			}
 		}
+
+		// retour au point initial de l'obstacle
+		if (abs(robotPosition.first - hitPoint.first) <= 10 and abs(robotPosition.second - hitPoint.second <= 10)) {
+			bypassed = true;
+		}
+	}
+
+	// return to min point
+	if (foundObstacle && bypassed) {
+		if ( std::get<LEFT>(sensorsDistance)-LEFT_INFERIOR_THRESHOLD < 5 || std::get<MIDDLE>(sensorsDistance) - FRONT_THRESHOLD < 5) // too close from the obstacle
+		{
+			moveAngle = currentAngle + 45;
+			pros::lcd::print(5, "Too close");
+		}
+		else if (LEFT_INFERIOR_THRESHOLD < std::get<LEFT>(sensorsDistance) && std::get<LEFT>(sensorsDistance) < LEFT_SUPERIOR_THRESHOLD && std::get<MIDDLE>(sensorsDistance) - FRONT_THRESHOLD > -5) // too close from the obstacle
+		{
+			moveAngle = currentAngle;
+			moveDist = 50;
+			pros::lcd::print(5, "a cote");
+		}
+		else if (std::get<LEFT>(sensorsDistance) > LEFT_SUPERIOR_THRESHOLD ) // Too far from obstacle
+		{
+			pros::lcd::print(5, "Too far");
+			moveAngle = currentAngle - 15;
+		}
+		else
+		{
+			pros::lcd::print(5, "RAS");
+			moveDist = 50;
+			moveAngle = currentAngle;
+		}
+
+		// return to min so ended
+		if (abs(robotPosition.first - min.first) <= 10 and abs(robotPosition.second - min.second <= 10))
+		{
+			pros::lcd::print(5, "Encountered min");
+			moveAngle = teta;
+			moveDist = 50;
+			// Quit obstacle
+			foundObstacle = false;
+			bypassed = false;
+		}
+		return std::make_pair(moveDist, moveAngle);
 	}
 
 	if (std::get<MIDDLE>(sensorsDistance) < FRONT_THRESHOLD) // Encountered obstacle
