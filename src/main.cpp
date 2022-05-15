@@ -42,6 +42,11 @@ using namespace okapi;
 #define RAD_TO_DEGREE(v) v * 360 / (2 * PI)
 #define DEGREE_TO_RAD(v) v *(2 * PI) / 360
 
+#define MOVEMENT_ALGO SEQUENCE
+
+#define RAD_TO_DEGREES(r) r * 360 / (2 * PI)
+#define DEGREES_TO_RAD(r) r * 2 * PI / 360
+
 // sensors and actuators
 Controller controller;
 Motor motorFL = Motor(PORT_FL_WHEEL, WHEEL_DIRECTION_FL, WHEEL_GEARSET, WHEEL_ENCODER_UNIT);
@@ -61,6 +66,7 @@ std::pair<double, double> targetPosition(X_TARGET, Y_TARGET);
 // Enum for next move algorithms
 enum ALGORITHM
 {
+	SEQUENCE,
 	BUG0,
 	BUG1,
 	BUG2
@@ -91,7 +97,7 @@ std::pair<double, double> bug0(double currentAngle, std::tuple<double, double, d
 	double dx = targetPosition.first - robotPosition.first;
 	double dy = targetPosition.second - robotPosition.second;
 	// Target - Position
-	double teta = 90 - atan2(dy, dx) * 360 / (2 * PI);
+	double teta = 90 - RAD_TO_DEGREES(atan2(dy, dx));
 	double moveDist = 0;
 	double moveAngle = 0;
 	std::pair<double, double> hitPoint;
@@ -346,6 +352,7 @@ void initialize()
 	drive = ChassisControllerBuilder()
 				.withMotors(motorFL, motorFR, motorBR, motorBL)
 				.withDimensions(WHEEL_GEARSET, {{WHEEL_DIAMETER, WHEEL_TRACK}, imev5GreenTPR})
+				// .withGains({0.001, 0, 0.0001}, {0.001, 0, 0.0001})
 				.build();
 	pros::delay(2000);
 	while (ultraSonicMiddle.get() == 0)
@@ -414,6 +421,32 @@ void moveStraight(double distance)
 	drive->moveDistance(distance * millimeter);
 }
 
+int sequenceCount = 0;
+std::vector<std::pair<double, double>> sequence = {
+	std::make_pair(500, 0),
+	std::make_pair(-500, 0),
+	std::make_pair(500, 0),
+	std::make_pair(-500, 0),
+	// std::make_pair(500, 0),
+	// std::make_pair(-500, 0),
+	// std::make_pair(500, 0),
+	// std::make_pair(-500, 0),
+	// std::make_pair(500, 0),
+	// std::make_pair(-500, 0),
+	// std::make_pair(500, 0),
+	// std::make_pair(-500, 0),
+	// std::make_pair(500, 0),
+	// std::make_pair(-500, 0),
+	// std::make_pair(500, 0),
+	// std::make_pair(-500, 0),
+	// std::make_pair(500, 0),
+	// std::make_pair(-500, 0),
+	// std::make_pair(500, 0),
+	// std::make_pair(-500, 0),
+	// std::make_pair(500, 0),
+	// std::make_pair(-500, 0),
+};
+
 // return next move in polar coordinates
 std::pair<double, double> getStrategyNextMove(
 	ALGORITHM algo,
@@ -426,14 +459,18 @@ std::pair<double, double> getStrategyNextMove(
 
 	switch (algo)
 	{
-	case BUG2:
-		nextMovement = bug2(currentAngle, sensorsDistance);
+	case SEQUENCE:
+		nextMovement =
+			sequenceCount <= sequence.size() ? sequence[sequenceCount++] : std::make_pair(0.0, currentAngle);
 		break;
 	case BUG0:
 		nextMovement = bug0(currentAngle, sensorsDistance);
 		break;
-
+	case BUG2:
+		nextMovement = bug2(currentAngle, sensorsDistance);
+		break;
 	default:
+		nextMovement = std::make_pair(0.0, currentAngle);
 		break;
 	}
 
@@ -442,8 +479,8 @@ std::pair<double, double> getStrategyNextMove(
 
 void recalculatePosition(double distance, double angle)
 {
-	robotPosition.first += distance * sin(angle * 2 * PI / 360);
-	robotPosition.second += distance * cos(angle * 2 * PI / 360);
+	robotPosition.first += distance * sin(DEGREES_TO_RAD(angle));
+	robotPosition.second += distance * cos(DEGREES_TO_RAD(angle));
 }
 
 /**
@@ -481,13 +518,13 @@ void opcontrol()
 		pros::lcd::print(3, "gyroscope %.2f degrees", currentAngle);
 		pros::lcd::print(4, "current pos %.2f %.2f", robotPosition.first, robotPosition.second);
 
-		nextMove = getStrategyNextMove(BUG0, currentAngle, sensorsDistance);
+		nextMove = getStrategyNextMove(MOVEMENT_ALGO, currentAngle, sensorsDistance);
 		moveToAngle(currentAngle, nextMove.second, maxAngleError);
 		moveStraight(nextMove.first);
 		currentAngle = gyroscope.get();
 		recalculatePosition(nextMove.first, currentAngle);
 
 		// Delay between iteraction
-		pros::delay(10);
+		pros::delay(50);
 	}
 }
