@@ -29,8 +29,8 @@ using namespace okapi;
 #define WHEEL_TRACK 380_mm
 
 // Target position
-#define X_TARGET 100
-#define Y_TARGET 1000
+#define X_TARGET 200
+#define Y_TARGET 1500
 
 // Threshold for sensors
 #define SENSOR_THRESHOLD 300
@@ -109,7 +109,7 @@ std::pair<double, double> bug0(double currentAngle, std::tuple<double, double, d
 
 	pros::lcd::print(6, "Teta: %.2f  currentAngle: %.2f", teta, currentAngle);
 
-	if (abs(dx) < (MOVE_STEP) && abs(dy) < (MOVE_STEP))
+	if (abs(dx) < (MOVE_STEP + 100) && abs(dy) < (MOVE_STEP + 100))
 	{
 		return std::make_pair(0, currentAngle);
 	}
@@ -530,7 +530,7 @@ void opcontrol()
 		pros::lcd::print(3, "gyroscope %.2f degrees", currentAngle);
 		pros::lcd::print(4, "current pos %.2f %.2f", robotPosition.first, robotPosition.second);
 
-		nextMove = getStrategyNextMove(SEQUENCE, currentAngle, sensorsDistance);
+		nextMove = getStrategyNextMove(BUG0, currentAngle, sensorsDistance);
 		moveToAngle(currentAngle, nextMove.second, maxAngleError);
 		moveStraight(nextMove.first);
 		currentAngle = gyroscope.get();
