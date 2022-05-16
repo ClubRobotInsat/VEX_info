@@ -30,7 +30,7 @@ using namespace okapi;
 
 // Target position
 #define X_TARGET 200
-#define Y_TARGET 1500
+#define Y_TARGET 2000
 
 // Threshold for sensors
 #define SENSOR_THRESHOLD 300
@@ -54,7 +54,7 @@ Motor motorFR = Motor(PORT_FR_WHEEL, WHEEL_DIRECTION_FR, WHEEL_GEARSET, WHEEL_EN
 Motor motorBL = Motor(PORT_BL_WHEEL, WHEEL_DIRECTION_BL, WHEEL_GEARSET, WHEEL_ENCODER_UNIT);
 Motor motorBR = Motor(PORT_BR_WHEEL, WHEEL_DIRECTION_BR, WHEEL_GEARSET, WHEEL_ENCODER_UNIT);
 ADIUltrasonic ultraSonicLeft = ADIUltrasonic(PORT_SENSOR1_TRIGGER, PORT_SENSOR1_DATA);
-ADIUltrasonic ultraSonicMiddle = ADIUltrasonic(PORT_SENSOR2_TRIGGER, PORT_SENSOR2_DATA);
+ADIUltrasonic ultraSonicMiddle = ADIUltrasonic(PORT_SENSOR3_TRIGGER, PORT_SENSOR3_DATA);
 ADIUltrasonic ultraSonicRight = ADIUltrasonic(PORT_SENSOR3_TRIGGER, PORT_SENSOR3_DATA);
 IMU gyroscope = IMU(PORT_GYROSCOPE, okapi::IMUAxes::z);
 std::shared_ptr<ChassisController> drive;
@@ -86,9 +86,9 @@ enum SENSORS
 bool createdLine = false;
 double alphaLine = -1;
 double betaLine = -1;
-double bypassed = false;
+
 bool foundObstacle = false;
-bool firstEncounter = true;
+
 bool checkLeave = false;
 bool wasTooClose = false;
 // Coordinates of the closest point to the target next to the obstacle
@@ -125,7 +125,7 @@ std::pair<double, double> bug0(double currentAngle, std::tuple<double, double, d
 		}
 		else
 		{
-			pros::lcd::print(5, "Straight normal");
+			pros::lcd::print(5, "Straight norPORT_SENSOR2_TRIGGERmal");
 			moveDist = MOVE_STEP;
 			diff = teta - currentAngle;
 			moveAngle = (abs(diff) < 10) ? teta : (diff >= 0 ? currentAngle + 10 : currentAngle - 10);
@@ -153,116 +153,97 @@ std::pair<double, double> bug0(double currentAngle, std::tuple<double, double, d
 	return std::make_pair(moveDist, moveAngle);
 }
 
+bool bypassed = true;
+bool firstEncounter = true;
 std::pair<double, double> bug1(double currentAngle, std::tuple<double, double, double> sensorsDistance)
 {
 	double dx = targetPosition.first - robotPosition.first;
 	double dy = targetPosition.second - robotPosition.second;
 	// Target - Position
-	double teta = double(int32_t((90 - atan2(dy, dx) * 360 / (2 * PI)) + 180) % 360 - 180);
+
+	double teta = double(int64_t(90. - RAD_TO_DEGREES(atan2(dy, dx)) + 180) % 360 - 180);
 	double moveDist = 0;
 	double moveAngle = 0;
 	std::pair<double, double> hitPoint;
+	double diff;
+	bool passedObstacle = false;
 
-	if (abs(dx) < 5 + MOVE_STEP && abs(dy) < 5 + MOVE_STEP)
+	if (abs(dx) < (MOVE_STEP + 100) && abs(dy) < (MOVE_STEP + 100))
 	{
 		return std::make_pair(0, currentAngle);
+		pros::lcd::print(6, "Arrived");
 	}
 
-	// Obstacle first encountered => get around
-	if (foundObstacle && !bypassed)
-	{
+	if (abs(robotPosition.first-hitPoint.first) < 20  && abs(robotPosition.second - hitPoint.second) < 20 && !firstEncounter){
+		bypassed = true;
+	}
 
-		if (std::get<LEFT>(sensorsDistance) - CRITICAL_SENSOR_THRESHOLD < MOVE_STEP || std::get<MIDDLE>(sensorsDistance) - SENSOR_THRESHOLD < MOVE_STEP && (std::get<MIDDLE>(sensorsDistance)))
-		{
-			moveAngle = currentAngle + TURN_STEP;
-			moveDist = MOVE_STEP;
-			pros::lcd::print(5, "Too close");
+	if (!bypassed){
+		if((dx*dx+dy*dy) < (min.first*min.first+min.second*min.second)){
+			min = robotPosition;
 		}
-		else if (CRITICAL_SENSOR_THRESHOLD < std::get<LEFT>(sensorsDistance) && std::get<LEFT>(sensorsDistance) < SENSOR_THRESHOLD)
+	}
+
+	if (std::get<MIDDLE>(sensorsDistance) > SENSOR_THRESHOLD && std::get<LEFT>(sensorsDistance) > SENSOR_THRESHOLD && (std::get<MIDDLE>(sensorsDistance)) && (std::get<LEFT>(sensorsDistance)))
+	{
+		if (wasTooClose)
 		{
+			pros::lcd::print(5, "Straight left obst");
+			moveDist = MOVE_STEP;
 			moveAngle = currentAngle;
-			moveDist = MOVE_STEP;
-			pros::lcd::print(5, "a cote");
-		}
-		else if (std::get<LEFT>(sensorsDistance) > SENSOR_THRESHOLD) // Too far from obstacle
-		{
-			pros::lcd::print(5, "Too far");
-			moveAngle = currentAngle - 15;
+			wasTooClose = false;
 		}
 		else
 		{
-			pros::lcd::print(5, "RAS");
-			moveDist = MOVE_STEP;
-			moveAngle = currentAngle;
 
-			// calcul du nouveau minimum
-			if ((dx * dx + dy * dy) < (min.first * min.first + min.second * min.second))
+			if (!bypassed)
 			{
-				min = robotPosition;
+				pros::lcd::print(5, "not bypassed");
+				moveDist = MOVE_STEP;
+				moveAngle = currentAngle - TURN_STEP;
+			}else{
+				pros::lcd::print(5, "Straight normal");
+				moveDist = MOVE_STEP;
+				diff = teta - currentAngle;
+				moveAngle = (abs(diff) < 10) ? teta : (diff >= 0 ? currentAngle + 10 : currentAngle - 10);
 			}
 		}
 
-		// retour au point initial de l'obstacle
-		if (abs(robotPosition.first - hitPoint.first) <= 10 and abs(robotPosition.second - hitPoint.second) <= 10)
-		{
-			bypassed = true;
-		}
+
 	}
-
-	// return to min point
-	if (foundObstacle && bypassed)
+	else if (std::get<MIDDLE>(sensorsDistance) > SENSOR_THRESHOLD && std::get<LEFT>(sensorsDistance) < SENSOR_THRESHOLD + 50 && std::get<LEFT>(sensorsDistance) > CRITICAL_SENSOR_THRESHOLD && (std::get<MIDDLE>(sensorsDistance)) && (std::get<LEFT>(sensorsDistance)))
 	{
-		if (std::get<LEFT>(sensorsDistance) - CRITICAL_SENSOR_THRESHOLD < MOVE_STEP || std::get<MIDDLE>(sensorsDistance) - SENSOR_THRESHOLD < MOVE_STEP && (std::get<MIDDLE>(sensorsDistance)))
-		{
-			moveAngle = currentAngle + 30;
-			pros::lcd::print(5, "Too close");
-		}
-		else if (CRITICAL_SENSOR_THRESHOLD < std::get<LEFT>(sensorsDistance) && std::get<LEFT>(sensorsDistance) < SENSOR_THRESHOLD && (std::get<MIDDLE>(sensorsDistance) - SENSOR_THRESHOLD > MOVE_STEP || (std::get<MIDDLE>(sensorsDistance))))
-		{
-			moveAngle = currentAngle;
-			moveDist = MOVE_STEP;
-			pros::lcd::print(5, "a cote");
-		}
-		else if (std::get<LEFT>(sensorsDistance) > SENSOR_THRESHOLD) // Too far from obstacle
-		{
-			pros::lcd::print(5, "Too far");
-			moveAngle = currentAngle - 15;
-		}
-		else
-		{
-			pros::lcd::print(5, "RAS");
-			moveDist = MOVE_STEP;
-			moveAngle = currentAngle;
-		}
-
-		// return to min so ended
-		if (abs(robotPosition.first - min.first) <= 10 and abs(robotPosition.second - min.second <= 10))
-		{
-			pros::lcd::print(5, "Encountered min");
-			moveAngle = teta;
-			moveDist = MOVE_STEP;
-			// Quit obstacle
-			foundObstacle = false;
+		pros::lcd::print(5, "A cote");
+		moveDist = MOVE_STEP;
+		moveAngle = currentAngle;
+	}
+	else if (std::get<LEFT>(sensorsDistance) < CRITICAL_SENSOR_THRESHOLD || std::get<MIDDLE>(sensorsDistance) < SENSOR_THRESHOLD && (std::get<MIDDLE>(sensorsDistance)) && (std::get<LEFT>(sensorsDistance)))
+	{
+		pros::lcd::print(5, "Too close");
+		moveAngle = TURN_STEP + currentAngle;
+		wasTooClose = true;
+		if (bypassed && firstEncounter){
+			hitPoint = robotPosition;
+			firstEncounter = false;
 			bypassed = false;
 		}
-		return std::make_pair(moveDist, moveAngle);
-	}
-
-	if (std::get<MIDDLE>(sensorsDistance) < SENSOR_THRESHOLD && std::get<MIDDLE>(sensorsDistance)) // Encountered obstacle
-	{
-		pros::lcd::print(5, "Encountered obstacle");
-		moveAngle = currentAngle + TURN_STEP;
-		hitPoint = robotPosition;
-		foundObstacle = true;
-		firstEncounter = true;
 	}
 	else
 	{
-		pros::lcd::print(5, "Nothing in front");
-		pros::lcd::print(6, "teta : %.2f", teta);
-		moveAngle = teta;
-		moveDist = MOVE_STEP;
+		pros::lcd::print(5, "else");
+		moveDist = 0;
+		moveAngle = currentAngle;
 	}
+
+	if (bypassed && abs(min.first-robotPosition.first)<50 && abs(min.second-robotPosition.second)){
+		pros::lcd::print(5, "towards the target yeee");
+		moveAngle = teta;
+		firstEncounter = true;
+	}
+
+	pros::lcd::print(6, "Bypassed: %d",bypassed);
+
+
 
 	return std::make_pair(moveDist, moveAngle);
 }
@@ -279,8 +260,11 @@ std::pair<double, double> bug2(double currentAngle, std::tuple<double, double, d
 
 	if (abs(dx) < MOVE_STEP && abs(dy) < MOVE_STEP)
 	{
+		pros::lcd::print(5, "Arrived");
 		return std::make_pair(0, currentAngle);
 	}
+
+
 
 	// Obstacle following mode
 	if (foundObstacle)
@@ -301,6 +285,7 @@ std::pair<double, double> bug2(double currentAngle, std::tuple<double, double, d
 		else if (std::get<LEFT>(sensorsDistance) - SENSOR_THRESHOLD > MOVE_STEP)
 		{
 			moveAngle = currentAngle - TURN_STEP;
+			moveDist = MOVE_STEP;
 			pros::lcd::print(5, "Too far");
 		}
 		else
@@ -451,7 +436,7 @@ void moveStraight(double distance)
 int sequenceCount = 0;
 std::vector<std::pair<double, double>> sequence = {
 	// std::make_pair(500, 0)
-	std::make_pair(1000, 0)
+	// std::make_pair(1000, 0)
 	// std::make_pair(1500, 0)
 	// std::make_pair(2000, 0)
 	// std::make_pair(2500, 0)
@@ -477,6 +462,9 @@ std::pair<double, double> getStrategyNextMove(
 		break;
 	case BUG0:
 		nextMovement = bug0(currentAngle, sensorsDistance);
+		break;
+	case BUG1:
+		nextMovement = bug1(currentAngle, sensorsDistance);
 		break;
 	case BUG2:
 		nextMovement = bug2(currentAngle, sensorsDistance);
@@ -530,13 +518,13 @@ void opcontrol()
 		pros::lcd::print(3, "gyroscope %.2f degrees", currentAngle);
 		pros::lcd::print(4, "current pos %.2f %.2f", robotPosition.first, robotPosition.second);
 
-		nextMove = getStrategyNextMove(BUG0, currentAngle, sensorsDistance);
+		nextMove = getStrategyNextMove(BUG2, currentAngle, sensorsDistance);
 		moveToAngle(currentAngle, nextMove.second, maxAngleError);
 		moveStraight(nextMove.first);
 		currentAngle = gyroscope.get();
 		recalculatePosition(nextMove.first, currentAngle);
 
 		// Delay between iteraction
-		pros::delay(1000);
+		pros::delay(200);
 	}
 }
