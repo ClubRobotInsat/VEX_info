@@ -352,7 +352,7 @@ void initialize()
 	drive = ChassisControllerBuilder()
 				.withMotors(motorFL, motorFR, motorBR, motorBL)
 				.withDimensions(WHEEL_GEARSET, {{WHEEL_DIAMETER, WHEEL_TRACK}, imev5GreenTPR})
-				// .withGains({0.001, 0, 0.0001}, {0.001, 0, 0.0001})
+				.withGains({1, 0, 0}, {1, 0, 0})
 				.build();
 	pros::delay(2000);
 	while (ultraSonicMiddle.get() == 0)
@@ -423,27 +423,8 @@ void moveStraight(double distance)
 
 int sequenceCount = 0;
 std::vector<std::pair<double, double>> sequence = {
-	std::make_pair(500, 0),
-	std::make_pair(-500, 0),
-	std::make_pair(500, 0),
-	std::make_pair(-500, 0),
-	// std::make_pair(500, 0),
-	// std::make_pair(-500, 0),
-	// std::make_pair(500, 0),
-	// std::make_pair(-500, 0),
-	// std::make_pair(500, 0),
-	// std::make_pair(-500, 0),
-	// std::make_pair(500, 0),
-	// std::make_pair(-500, 0),
-	// std::make_pair(500, 0),
-	// std::make_pair(-500, 0),
-	// std::make_pair(500, 0),
-	// std::make_pair(-500, 0),
-	// std::make_pair(500, 0),
-	// std::make_pair(-500, 0),
-	// std::make_pair(500, 0),
-	// std::make_pair(-500, 0),
-	// std::make_pair(500, 0),
+	std::make_pair(3500, 0),
+	std::make_pair(-3500, 0),
 	// std::make_pair(-500, 0),
 };
 
@@ -507,6 +488,8 @@ void opcontrol()
 	std::tuple<double, double, double> sensorsDistance;
 	std::pair<double, double> nextMove(0, 0);
 
+	Timer t = Timer();
+	bool foundt = false;
 	while (execute)
 	{
 		sensorsDistance = {ultraSonicLeft.get(), ultraSonicMiddle.get(), ultraSonicRight.get()};
@@ -520,11 +503,16 @@ void opcontrol()
 
 		nextMove = getStrategyNextMove(MOVEMENT_ALGO, currentAngle, sensorsDistance);
 		moveToAngle(currentAngle, nextMove.second, maxAngleError);
+		QTime t1 = t.millis();
 		moveStraight(nextMove.first);
+		if (!foundt) {
+			foundt = true;
+			pros::lcd::print(1, "tiempo %.6f", t1-t.millis());
+		}
 		currentAngle = gyroscope.get();
 		recalculatePosition(nextMove.first, currentAngle);
 
 		// Delay between iteraction
-		pros::delay(50);
+		pros::delay(10000);
 	}
 }
